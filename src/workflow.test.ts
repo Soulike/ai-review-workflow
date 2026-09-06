@@ -12,7 +12,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { runInNewContext } from "node:vm";
 import { isMap, isSeq, parseDocument } from "yaml";
+import { parsePublicationIdentity } from "./review-state.ts";
 
 const root = new URL("../", import.meta.url);
 const compiledText = await readFile(
@@ -49,7 +51,7 @@ test("the self-consumer forwards repository reasoning effort without a fallback"
     "${{ inputs.reasoning-effort }}",
   );
   assert.equal(
-    compiled.getIn(["env", "KESTREL_REASONING_EFFORT"]),
+    compiled.getIn(["env", "AI_REVIEW_REASONING_EFFORT"]),
     "${{ inputs.reasoning-effort }}",
   );
 });
@@ -88,7 +90,7 @@ test("the public interface forwards only the three settings and Tavily secret to
   );
   assert.equal(
     caller.getIn(["jobs", "review", "uses"]),
-    "Soulike/kestrel/.github/workflows/ai-review.yml@main",
+    "Soulike/ai-review-workflow/.github/workflows/ai-review.yml@main",
   );
   assert.equal(caller.getIn(["concurrency", "cancel-in-progress"]), true);
   assert.notEqual(
@@ -126,16 +128,16 @@ test("a guard-only rerun cannot republish earlier successful inference", async (
       "steps",
       index,
       "env",
-      "KESTREL_PREPARE_ATTEMPT",
+      "AI_REVIEW_PREPARE_ATTEMPT",
     ]),
     "${{ needs.prepare.outputs.run-attempt }}",
   );
   await promisify(execFile)("bash", ["-c", run], {
-    env: { GITHUB_RUN_ATTEMPT: "2", KESTREL_PREPARE_ATTEMPT: "2" },
+    env: { GITHUB_RUN_ATTEMPT: "2", AI_REVIEW_PREPARE_ATTEMPT: "2" },
   });
   await assert.rejects(
     promisify(execFile)("bash", ["-c", run], {
-      env: { GITHUB_RUN_ATTEMPT: "3", KESTREL_PREPARE_ATTEMPT: "2" },
+      env: { GITHUB_RUN_ATTEMPT: "3", AI_REVIEW_PREPARE_ATTEMPT: "2" },
     }),
   );
 });
@@ -155,6 +157,45 @@ test("publisher authentication is bound in a trusted pre-step before the handler
       "process_safe_outputs",
   );
   assert.ok(binding >= 0 && handler > binding);
+  const bindingScript = compiled.getIn([
+    "jobs",
+    "safe_outputs",
+    "steps",
+    binding,
+    "with",
+    "script",
+  ]);
+  assert.ok(typeof bindingScript === "string");
+  const exported = new Map<string, string>();
+  runInNewContext(bindingScript, {
+    process: {
+      env: {
+        AI_REVIEW_CALL_ID: "66",
+        AI_REVIEW_CHECK_RUN_ID: "77",
+        AI_REVIEW_IMPLEMENTATION_SHA: "c".repeat(40),
+        GITHUB_RUN_ATTEMPT: "2",
+      },
+    },
+    core: {
+      exportVariable: (name: string, value: string) =>
+        exported.set(name, value),
+    },
+  });
+  const messages: unknown = JSON.parse(
+    exported.get("GH_AW_SAFE_OUTPUT_MESSAGES") ?? "null",
+  );
+  assert.ok(
+    messages &&
+      typeof messages === "object" &&
+      "footer" in messages &&
+      typeof messages.footer === "string",
+  );
+  assert.deepEqual(parsePublicationIdentity(messages.footer), {
+    callId: 66,
+    checkRunId: 77,
+    implementationSha: "c".repeat(40),
+    runAttempt: 2,
+  });
   assert.equal(
     compiled.getIn([
       "jobs",
@@ -162,7 +203,7 @@ test("publisher authentication is bound in a trusted pre-step before the handler
       "steps",
       binding,
       "env",
-      "KESTREL_CHECK_ID",
+      "AI_REVIEW_CHECK_RUN_ID",
     ]),
     "${{ job.check_run_id }}",
   );
@@ -173,7 +214,7 @@ test("publisher authentication is bound in a trusted pre-step before the handler
       "steps",
       binding,
       "env",
-      "KESTREL_CALL_ID",
+      "AI_REVIEW_CALL_ID",
     ]),
     "${{ needs.publication_guard.outputs.call-id }}",
   );
@@ -202,7 +243,10 @@ test("candidate CI and reviewer execute different trees, both on selected Node L
   assert.equal(source.getIn(["runtimes", "node", "version"]), "lts/*");
   assert.equal(source.getIn(["checkout"]), false);
   assert.doesNotMatch(compiledText, /checkout_pr_branch\.cjs/u);
-  assert.doesNotMatch(compiledText, /--exclude-env KESTREL_REASONING_EFFORT/u);
+  assert.doesNotMatch(
+    compiledText,
+    /--exclude-env AI_REVIEW_REASONING_EFFORT/u,
+  );
   const steps = compiled.getIn(["jobs", "agent", "steps"]);
   assert.ok(isSeq(steps));
   const consumer = steps.items.findIndex(
@@ -213,7 +257,7 @@ test("candidate CI and reviewer execute different trees, both on selected Node L
   const assets = steps.items.findIndex(
     (_, i) =>
       compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
-      "Check out the invoked Kestrel assets",
+      "Check out workflow implementation",
   );
   assert.ok(consumer >= 0 && assets >= 0);
   assert.equal(
@@ -231,12 +275,12 @@ test("candidate CI and reviewer execute different trees, both on selected Node L
   const install = steps.items.findIndex(
     (_, i) =>
       compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
-      "Install only Kestrel implementation dependencies",
+      "Install workflow dependencies",
   );
   assert.ok(install >= 0);
   assert.equal(
     compiled.getIn(["jobs", "agent", "steps", install, "working-directory"]),
-    "kestrel",
+    "workflow",
   );
   assert.match(
     String(compiled.getIn(["jobs", "agent", "steps", install, "run"])),
@@ -246,7 +290,7 @@ test("candidate CI and reviewer execute different trees, both on selected Node L
 });
 
 test("compiled installation stages the CLI before its launcher forwards effort and arguments", async (t) => {
-  const temporary = await mkdtemp(path.join(os.tmpdir(), "kestrel-launcher-"));
+  const temporary = await mkdtemp(path.join(os.tmpdir(), "review-launcher-"));
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const binaryDir = path.join(temporary, "downloaded");
   await mkdir(binaryDir, { recursive: true });
@@ -313,7 +357,7 @@ test("compiled installation stages the CLI before its launcher forwards effort a
     PATH: `${binaryDir}:${process.env.PATH}`,
     RUNNER_TEMP: temporary,
     ENGINE_VERSION: "1.2.3",
-    KESTREL_REASONING_EFFORT: "xhigh",
+    AI_REVIEW_REASONING_EFFORT: "xhigh",
   };
   await promisify(execFile)("bash", ["-eu", "-c", installation], { env });
   const { stdout } = await promisify(execFile)(
@@ -327,7 +371,7 @@ test("compiled installation stages the CLI before its launcher forwards effort a
   );
   await assert.rejects(
     promisify(execFile)("bash", ["-c", command], {
-      env: { ...env, KESTREL_REASONING_EFFORT: "" },
+      env: { ...env, AI_REVIEW_REASONING_EFFORT: "" },
     }),
     /reasoning effort is required/u,
   );

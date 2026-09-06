@@ -1,4 +1,4 @@
-name: Kestrel
+name: AI review workflow
 
 on:
   workflow_call:

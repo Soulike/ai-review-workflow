@@ -6,7 +6,7 @@ import test from "node:test";
 import { compileAgenticWorkflows } from "./compiler-contract.ts";
 
 test("compiler launcher checks its selected binary and propagates compiler failures", async (t) => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "kestrel-compiler-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "workflow-compiler-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const compiler = path.join(root, "compiler");
   const marker = path.join(root, "called");

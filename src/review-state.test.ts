@@ -18,14 +18,14 @@ function reviewBody(visibleVerdict: "approved" | "needs-change"): string {
 
 - **[low] docs/example.md — Clarify the contract**
 
-<!-- gh-aw-agentic-workflow: AI review, engine: copilot, version: latest, model: grok-4.6, id: 1234, workflow_id: ai-review, run: https://github.com/Soulike/knowledge-base/actions/runs/1234 -->`;
+<!-- gh-aw-agentic-workflow: AI review, engine: copilot, version: latest, model: grok-4.6, id: 1234, workflow_id: ai-review, run: https://github.com/owner/consumer/actions/runs/1234 -->`;
 }
 
 test("parses one consistent visible verdict and gh-aw attribution", () => {
   assert.deepEqual(parseReviewBody(reviewBody("approved")), {
     attribution: {
       runId: 1234,
-      runUrl: "https://github.com/Soulike/knowledge-base/actions/runs/1234",
+      runUrl: "https://github.com/owner/consumer/actions/runs/1234",
       workflowId: "ai-review",
       workflowName: "AI review",
     },

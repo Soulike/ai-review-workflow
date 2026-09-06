@@ -7,8 +7,8 @@ const validEnvironment: NodeJS.ProcessEnv = {
   AI_REVIEW_BASE_SHA: "a".repeat(40),
   AI_REVIEW_HEAD_SHA: "b".repeat(40),
   AI_REVIEW_PR_NUMBER: "42",
-  AI_REVIEW_PR_URL: "https://github.com/Soulike/knowledge-base/pull/42",
-  AI_REVIEW_REPOSITORY: "Soulike/knowledge-base",
+  AI_REVIEW_PR_URL: "https://github.com/owner/consumer/pull/42",
+  AI_REVIEW_REPOSITORY: "owner/consumer",
   GITHUB_RUN_ATTEMPT: "1",
   GITHUB_RUN_ID: "1234",
 };
@@ -18,8 +18,8 @@ test("reads the trusted gate identity without legacy runner configuration", () =
     baseSha: "a".repeat(40),
     expectedHeadSha: "b".repeat(40),
     prNumber: 42,
-    prUrl: "https://github.com/Soulike/knowledge-base/pull/42",
-    repository: "Soulike/knowledge-base",
+    prUrl: "https://github.com/owner/consumer/pull/42",
+    repository: "owner/consumer",
     runAttempt: 1,
     runId: 1234,
   });
@@ -58,7 +58,7 @@ test("binds the pull-request URL to the configured repository and number", () =>
       readReviewConfig({
         ...validEnvironment,
         AI_REVIEW_PR_URL:
-          "https://github.com/Soulike/knowledge-base/pull/42?unexpected=true",
+          "https://github.com/owner/consumer/pull/42?unexpected=true",
       }),
     /must identify AI_REVIEW_PR_NUMBER/u,
   );

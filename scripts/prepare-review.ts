@@ -9,7 +9,7 @@ const { values } = parseArgs({
 });
 if (!values["repository-root"])
   throw new Error("--repository-root is required.");
-const expectedVersion = process.env.KESTREL_COPILOT_VERSION;
+const expectedVersion = process.env.AI_REVIEW_COPILOT_VERSION;
 if (
   !expectedVersion ||
   !/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u.test(expectedVersion)
@@ -26,16 +26,16 @@ if (stdout.split("\n")[0] !== `GitHub Copilot CLI ${expectedVersion}.`) {
 const config = await prepareReview(
   values["repository-root"],
   {
-    model: process.env.KESTREL_MODEL,
-    reasoningEffort: process.env.KESTREL_REASONING_EFFORT,
-    reviewPromptPath: process.env.KESTREL_REVIEW_PROMPT_PATH,
+    model: process.env.AI_REVIEW_MODEL,
+    reasoningEffort: process.env.AI_REVIEW_REASONING_EFFORT,
+    reviewPromptPath: process.env.AI_REVIEW_PROMPT_PATH,
   },
   readReviewConfig(),
   process.env.GITHUB_TOKEN ?? "",
 );
 await mkdir("/tmp/gh-aw", { recursive: true });
 await writeFile(
-  "/tmp/gh-aw/kestrel-review-prompt.md",
+  "/tmp/gh-aw/repository-review-prompt.md",
   config.reviewPrompt?.content ?? "No additional repository review criteria.\n",
 );
 console.log(
