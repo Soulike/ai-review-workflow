@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out candidate code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install workflow validation tools
+        run: pnpm tools:setup
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Validate candidate code
+        run: pnpm check
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -1,0 +1,44 @@
+name: Kestrel
+
+on:
+  workflow_call:
+    inputs:
+      review-prompt-path:
+        description: Optional Markdown review criteria from the exact event base.
+        type: string
+        required: false
+        default: ""
+      model:
+        description: Copilot model selection.
+        type: string
+        required: false
+        default: auto
+      reasoning-effort:
+        description: Required concrete supported Copilot reasoning effort.
+        type: string
+        required: true
+    secrets:
+      TAVILY_API_KEY:
+        required: true
+
+permissions: {}
+
+jobs:
+  engine:
+    name: Engine
+    permissions:
+      actions: read
+      contents: read
+      discussions: read
+      issues: read
+      pull-requests: write
+      security-events: read
+      vulnerability-alerts: read
+      copilot-requests: write
+    uses: ./.github/workflows/review.lock.yml
+    with:
+      review-prompt-path: ${{ inputs.review-prompt-path }}
+      model: ${{ inputs.model }}
+      reasoning-effort: ${{ inputs.reasoning-effort }}
+    secrets:
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
