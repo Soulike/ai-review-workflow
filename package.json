@@ -1,0 +1,35 @@
+{
+  "name": "kestrel",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test 'src/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "preflight": "node scripts/preflight.ts",
+    "workflows:compile": "node scripts/compile.ts",
+    "tools:setup": "bash scripts/setup-ci-tools.sh",
+    "workflows:check": "node scripts/check.ts",
+    "workflows:lint": "node scripts/lint-workflows.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm workflows:check && pnpm workflows:lint"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.3",
+    "eslint": "^10.10.0",
+    "prettier": "^3.9.6",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.69.0",
+    "yaml": "^2.9.0"
+  }
+}

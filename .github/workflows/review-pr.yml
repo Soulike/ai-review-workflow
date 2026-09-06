@@ -1,0 +1,31 @@
+name: Review pull request
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize, converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  group: kestrel-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review
+    permissions:
+      actions: read
+      contents: read
+      discussions: read
+      issues: read
+      pull-requests: write
+      security-events: read
+      vulnerability-alerts: read
+      copilot-requests: write
+    uses: Soulike/kestrel/.github/workflows/ai-review.yml@main
+    with:
+      review-prompt-path: ""
+      model: ${{ vars.AI_REVIEW_MODEL || 'auto' }}
+      reasoning-effort: ${{ vars.AI_REVIEW_REASONING_EFFORT }}
+    secrets:
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}

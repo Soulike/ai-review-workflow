@@ -1,0 +1,6 @@
+.github/workflows/*.lock.yml
+.github/aw/
+.github/workflows/*.invalid.yml
+.cache/
+coverage/
+pnpm-lock.yaml
