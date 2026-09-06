@@ -83,6 +83,48 @@ test("the public interface forwards only the three settings and Tavily secret to
   assert.notEqual(compiled.getIn(["concurrency", "cancel-in-progress"]), true);
 });
 
+test("a guard-only rerun cannot republish earlier successful inference", async () => {
+  const steps = compiled.getIn(["jobs", "publication_guard", "steps"]);
+  assert.ok(isSeq(steps));
+  const index = steps.items.findIndex(
+    (_, i) =>
+      compiled.getIn(["jobs", "publication_guard", "steps", i, "name"]) ===
+      "Require a fresh full workflow attempt",
+  );
+  assert.ok(index >= 0);
+  const run = compiled.getIn([
+    "jobs",
+    "publication_guard",
+    "steps",
+    index,
+    "run",
+  ]);
+  assert.ok(typeof run === "string");
+  assert.equal(
+    compiled.getIn(["jobs", "prepare", "outputs", "run-attempt"]),
+    "${{ github.run_attempt }}",
+  );
+  assert.equal(
+    compiled.getIn([
+      "jobs",
+      "publication_guard",
+      "steps",
+      index,
+      "env",
+      "KESTREL_PREPARE_ATTEMPT",
+    ]),
+    "${{ needs.prepare.outputs.run-attempt }}",
+  );
+  await promisify(execFile)("bash", ["-c", run], {
+    env: { GITHUB_RUN_ATTEMPT: "2", KESTREL_PREPARE_ATTEMPT: "2" },
+  });
+  await assert.rejects(
+    promisify(execFile)("bash", ["-c", run], {
+      env: { GITHUB_RUN_ATTEMPT: "3", KESTREL_PREPARE_ATTEMPT: "2" },
+    }),
+  );
+});
+
 test("publisher authentication is bound in a trusted pre-step before the handler", () => {
   const steps = compiled.getIn(["jobs", "safe_outputs", "steps"]);
   assert.ok(isSeq(steps));
@@ -143,18 +185,34 @@ test("candidate CI and reviewer execute different trees, both on selected Node L
   assert.equal(ci.getIn(["permissions", "contents"]), "read");
   assert.equal(ci.getIn(["permissions", "pull-requests"]), undefined);
   assert.equal(source.getIn(["runtimes", "node", "version"]), "lts/*");
-  assert.equal(
-    source.getIn(["checkout", 1, "ref"]),
-    "${{ github.event.pull_request.base.sha }}",
-  );
-  assert.equal(source.getIn(["checkout", 2, "ref"]), "${{ job.workflow_sha }}");
-  assert.equal(
-    source.getIn(["checkout", 2, "repository"]),
-    "${{ job.workflow_repository }}",
-  );
+  assert.equal(source.getIn(["checkout"]), false);
+  assert.doesNotMatch(compiledText, /checkout_pr_branch\.cjs/u);
   assert.doesNotMatch(compiledText, /--exclude-env KESTREL_REASONING_EFFORT/u);
   const steps = compiled.getIn(["jobs", "agent", "steps"]);
   assert.ok(isSeq(steps));
+  const consumer = steps.items.findIndex(
+    (_, i) =>
+      compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
+      "Check out the exact consumer base",
+  );
+  const assets = steps.items.findIndex(
+    (_, i) =>
+      compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
+      "Check out the invoked Kestrel assets",
+  );
+  assert.ok(consumer >= 0 && assets >= 0);
+  assert.equal(
+    compiled.getIn(["jobs", "agent", "steps", consumer, "with", "ref"]),
+    "${{ github.event.pull_request.base.sha }}",
+  );
+  assert.equal(
+    compiled.getIn(["jobs", "agent", "steps", assets, "with", "ref"]),
+    "${{ job.workflow_sha }}",
+  );
+  assert.equal(
+    compiled.getIn(["jobs", "agent", "steps", assets, "with", "repository"]),
+    "${{ job.workflow_repository }}",
+  );
   const install = steps.items.findIndex(
     (_, i) =>
       compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
@@ -172,23 +230,77 @@ test("candidate CI and reviewer execute different trees, both on selected Node L
   assert.doesNotMatch(sourceText, /author_association|pnpm test|pnpm check/u);
 });
 
-test("the compiled engine launcher forwards the concrete effort and preserves arguments", async (t) => {
+test("compiled installation stages the CLI before its launcher forwards effort and arguments", async (t) => {
   const temporary = await mkdtemp(path.join(os.tmpdir(), "kestrel-launcher-"));
   t.after(() => rm(temporary, { recursive: true, force: true }));
-  const binaryDir = path.join(temporary, "gh-aw/bin");
+  const binaryDir = path.join(temporary, "downloaded");
   await mkdir(binaryDir, { recursive: true });
   const fakeBinary = path.join(binaryDir, "copilot");
   await writeFile(fakeBinary, '#!/bin/sh\nprintf "%s\\n" "$@"\n');
   await chmod(fakeBinary, 0o755);
-  const command = source.getIn(["engine", "command"]);
-  assert.equal(typeof command, "string");
-  assert.ok(typeof command === "string");
-  assert.ok(compiledText.includes(command.trim()));
+  const actionsDir = path.join(temporary, "gh-aw/actions");
+  await mkdir(actionsDir, { recursive: true });
+  await writeFile(
+    path.join(actionsDir, "install_copilot_cli.sh"),
+    'test "$1" = "1.2.3"\n',
+  );
+  const steps = compiled.getIn(["jobs", "agent", "steps"]);
+  assert.ok(isSeq(steps));
+  const installationIndex = steps.items.findIndex(
+    (_, i) =>
+      compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
+      "Install selected Copilot CLI for the custom launcher",
+  );
+  const preparationIndex = steps.items.findIndex(
+    (_, i) =>
+      compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
+      "Prepare trusted review evidence",
+  );
+  assert.ok(installationIndex >= 0 && installationIndex < preparationIndex);
+  const installation = compiled.getIn([
+    "jobs",
+    "agent",
+    "steps",
+    installationIndex,
+    "run",
+  ]);
+  assert.ok(typeof installation === "string");
+  assert.equal(
+    compiled.getIn([
+      "jobs",
+      "agent",
+      "steps",
+      installationIndex,
+      "env",
+      "ENGINE_VERSION",
+    ]),
+    "${{ needs.prepare.outputs.copilot-version }}",
+  );
+  const executionIndex = steps.items.findIndex(
+    (_, i) =>
+      compiled.getIn(["jobs", "agent", "steps", i, "id"]) ===
+      "agentic_execution",
+  );
+  const execution = compiled.getIn([
+    "jobs",
+    "agent",
+    "steps",
+    executionIndex,
+    "run",
+  ]);
+  assert.ok(typeof execution === "string");
+  const command =
+    /<<'GH_AW_ENGINE_COMMAND_EOF'\n([\s\S]*?)\nGH_AW_ENGINE_COMMAND_EOF/u.exec(
+      execution,
+    )?.[1];
+  assert.ok(command);
   const env = {
-    PATH: process.env.PATH,
+    PATH: `${binaryDir}:${process.env.PATH}`,
     RUNNER_TEMP: temporary,
+    ENGINE_VERSION: "1.2.3",
     KESTREL_REASONING_EFFORT: "high",
   };
+  await promisify(execFile)("bash", ["-eu", "-c", installation], { env });
   const { stdout } = await promisify(execFile)(
     "bash",
     ["-c", command, "launcher", "--model", "model with spaces"],

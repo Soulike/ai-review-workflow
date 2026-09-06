@@ -21,6 +21,9 @@ try {
         `${name} did not succeed (${process.env[name] ?? "missing"}). Re-run all jobs after correcting the cause.`,
       );
   }
+  if (process.env.KESTREL_PREPARE_ATTEMPT !== String(config.runAttempt)) {
+    throw new Error("Earlier inference cannot be reused. Re-run all jobs.");
+  }
   const client = new GitHubClient(
     process.env.GITHUB_TOKEN ?? "",
     config.repository,

@@ -25,6 +25,17 @@ test("gate explains draft and prerequisite failures without a token or fabricate
         ...environment,
         AI_REVIEW_EVENT_ACTION: "synchronize",
         AI_REVIEW_PR_DRAFT: "false",
+        KESTREL_PREPARE_RESULT: "success",
+        KESTREL_GUARD_RESULT: "success",
+        KESTREL_PREPARE_ATTEMPT: "1",
+      },
+      /Earlier inference cannot be reused/u,
+    ],
+    [
+      {
+        ...environment,
+        AI_REVIEW_EVENT_ACTION: "synchronize",
+        AI_REVIEW_PR_DRAFT: "false",
         KESTREL_PREPARE_RESULT: "failure",
       },
       /PREPARE_RESULT did not succeed/u,

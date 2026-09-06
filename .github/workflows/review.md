@@ -30,8 +30,8 @@ engine:
   id: copilot
   version: ${{ needs.prepare.outputs.copilot-version }}
   model: ${{ inputs.model || 'auto' }}
-  command: |
-    exec "${RUNNER_TEMP}/gh-aw/bin/copilot" --reasoning-effort "${KESTREL_REASONING_EFFORT:?reasoning effort is required}" "$@"
+  command: >-
+    exec "${RUNNER_TEMP}/gh-aw/bin/copilot" --reasoning-effort "${KESTREL_REASONING_EFFORT:?reasoning effort is required}"
 
 env:
   KESTREL_REASONING_EFFORT: ${{ inputs.reasoning-effort }}
@@ -69,21 +69,38 @@ runtimes:
   node:
     version: "lts/*"
 
-checkout:
-  - ref: ${{ github.event.pull_request.base.sha }}
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-  - repository: ${{ github.repository }}
-    ref: ${{ github.event.pull_request.base.sha }}
-    path: consumer
-    current: true
-    fetch-depth: 0
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-  - repository: ${{ job.workflow_repository }}
-    ref: ${{ job.workflow_sha }}
-    path: kestrel
-    github-token: ${{ secrets.GITHUB_TOKEN }}
+checkout: false
 
 pre-agent-steps:
+  - name: Check out trusted root instructions
+    uses: actions/checkout@v7
+    with:
+      ref: ${{ github.event.pull_request.base.sha }}
+      persist-credentials: false
+  - name: Check out the exact consumer base
+    uses: actions/checkout@v7
+    with:
+      repository: ${{ github.repository }}
+      ref: ${{ github.event.pull_request.base.sha }}
+      path: consumer
+      fetch-depth: 0
+      persist-credentials: false
+  - name: Check out the invoked Kestrel assets
+    uses: actions/checkout@v7
+    with:
+      repository: ${{ job.workflow_repository }}
+      ref: ${{ job.workflow_sha }}
+      path: kestrel
+      persist-credentials: false
+  - name: Install selected Copilot CLI for the custom launcher
+    env:
+      ENGINE_VERSION: ${{ needs.prepare.outputs.copilot-version }}
+      GH_AW_COMPILED_VERSION: v0.88.2
+      GH_HOST: github.com
+    run: |
+      bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" "$ENGINE_VERSION"
+      mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
+      install -m 755 "$(command -v copilot)" "${RUNNER_TEMP}/gh-aw/bin/copilot"
   - name: Set up Kestrel's pnpm
     uses: pnpm/action-setup@v6
     with:
@@ -153,6 +170,7 @@ jobs:
     outputs:
       copilot-version: ${{ steps.release.outputs.version }}
       reasoning-effort: ${{ steps.inputs.outputs.reasoning-effort }}
+      run-attempt: ${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -218,7 +236,7 @@ jobs:
 
   publication_guard:
     name: Validate current review subject
-    needs: [agent, detection]
+    needs: [agent, detection, prepare]
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -227,6 +245,14 @@ jobs:
     outputs:
       call-id: ${{ steps.current.outputs.call-id }}
     steps:
+      - name: Require a fresh full workflow attempt
+        env:
+          KESTREL_PREPARE_ATTEMPT: ${{ needs.prepare.outputs.run-attempt }}
+        run: |
+          if [ "$KESTREL_PREPARE_ATTEMPT" != "$GITHUB_RUN_ATTEMPT" ]; then
+            echo "::error::Earlier inference cannot be reused. Re-run all jobs."
+            exit 1
+          fi
       - name: Check out this Kestrel revision
         uses: actions/checkout@v7
         with:
@@ -287,6 +313,7 @@ jobs:
           AI_REVIEW_EVENT_ACTION: ${{ github.event.action }}
           AI_REVIEW_PR_DRAFT: ${{ github.event.pull_request.draft }}
           KESTREL_PREPARE_RESULT: ${{ needs.prepare.result }}
+          KESTREL_PREPARE_ATTEMPT: ${{ needs.prepare.outputs.run-attempt }}
           AI_REVIEW_AGENT_RESULT: ${{ needs.agent.result }}
           AI_REVIEW_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
           KESTREL_GUARD_RESULT: ${{ needs.publication_guard.result }}

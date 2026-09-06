@@ -16,6 +16,7 @@ const { stdout } = await executeFile(
     "--porcelain=v1",
     "--untracked-files=all",
     "--",
+    ".gitattributes",
     ".github/aw",
     ":(glob).github/workflows/*.lock.yml",
   ],

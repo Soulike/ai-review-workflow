@@ -66,6 +66,10 @@ Compiler schema and template-injection validation still run.
   GitHub access, and compiler invocation. `scripts/` owns executable entrypoints
   and runner setup.
 - The reviewer uses exact consumer-base instructions and separate Kestrel assets.
+  Automatic checkout is disabled: a reusable `workflow_call` does not give this
+  compiler the caller's target-event checkout protection. Explicit pre-Agent
+  checkouts select only trusted revisions; compiled tests reject the PR-head
+  checkout helper.
   It installs no consumer dependencies. CI alone executes candidate tests. Broad
   sandbox tools remain; non-execution of PR code is an instruction, not a
   technical confinement guarantee.
@@ -80,7 +84,10 @@ test oracle.
 
 Keep compiler/runtime versions coordinated. The small custom Copilot launcher
 forwards validated reasoning effort safely because this compiler cannot compile
-a dynamic `engine.args` expression. Its argument behavior is tested. A publisher
+a dynamic `engine.args` expression. A custom command disables gh-aw's automatic
+CLI installation, so a pre-Agent step explicitly invokes the same gh-aw installer
+with the selected version and stages the binary on its read-only runtime mount.
+The compiled installation/staging and launcher argument path are tested. A publisher
 pre-step records native job identity at step scope; gh-aw appends its footer after
 the Agent body. The gate does not authenticate by a short job name.
 
@@ -105,6 +112,10 @@ authorized maintainer may temporarily relax only its required-check rule,
 retaining PR-required changes and candidate CI. Record the reason, merge the
 reviewed repair, verify a fresh deployed run, then restore/recheck the exact
 required review check. Do not add automatic bypasses or direct pushes to main.
+
+The prepare job exports its run attempt. Both the publication guard and final
+gate require it to match the current attempt, preventing a failed-publication
+rerun from treating earlier successful inference as fresh. Recovery reruns all jobs.
 
 Knowledge-base is an upstream source/plugin, not an adoption target in this
 delivery. Changes there require separate authorization. Preserve the extracted
