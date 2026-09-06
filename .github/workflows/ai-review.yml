@@ -17,6 +17,11 @@ on:
         description: Required concrete supported Copilot reasoning effort.
         type: string
         required: true
+      network_allowed:
+        description: Additional allowed network domains or gh-aw ecosystems, comma-separated.
+        type: string
+        required: false
+        default: ""
     secrets:
       TAVILY_API_KEY:
         required: true
@@ -40,5 +45,6 @@ jobs:
       review-prompt-path: ${{ inputs.review-prompt-path }}
       model: ${{ inputs.model }}
       reasoning-effort: ${{ inputs.reasoning-effort }}
+      network_allowed: ${{ inputs.network_allowed }}
     secrets:
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}

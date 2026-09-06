@@ -33,8 +33,11 @@ repository variables used by the caller below:
 - `AI_REVIEW_REASONING_EFFORT` is required. Set a concrete supported value such
   as `high`; there is no fallback when it is unset or invalid.
 - `AI_REVIEW_MODEL` is optional. Leave it unset to use `auto`.
+- `AI_REVIEW_NETWORK_ALLOWED` is optional. Leave it unset to use the default
+  network allowlist, or supply additions as described under
+  [extra network access](#extra-network-access).
 
-These are non-secret settings. Both are forwarded to the reusable workflow's
+These are non-secret settings. They are forwarded to the reusable workflow's
 inputs; changing them does not require editing the workflow. See the
 [input contract](#configure-the-review) for supported values.
 
@@ -73,6 +76,7 @@ jobs:
       review-prompt-path: ""
       model: ${{ vars.AI_REVIEW_MODEL || 'auto' }}
       reasoning-effort: ${{ vars.AI_REVIEW_REASONING_EFFORT }}
+      network_allowed: ${{ vars.AI_REVIEW_NETWORK_ALLOWED }}
     secrets:
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
 ```
@@ -100,6 +104,7 @@ workflow.
 | `review-prompt-path` | Optional repository-root-relative `.md` or `.markdown` path. Empty means shared criteria only. Missing files, directories, absolute paths, traversal, and escaping symlinks fail setup.           |
 | `model`              | Defaults to `auto`; use a literal or your own variable. Copilot must support and authorize the selection. The workflow does not substitute an unsupported selection.                              |
 | `reasoning-effort`   | Required: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Empty, whitespace-padded, and unsupported values fail before inference. The selected model must also support the effort. |
+| `network_allowed`    | Optional comma-separated domains or gh-aw ecosystem identifiers. Empty keeps the default allowlist; entries add to it. See [extra network access](#extra-network-access).                         |
 
 To extend shared criteria, commit a Markdown prompt such as
 `docs/review-criteria.md` and set its path in the caller. Describe
@@ -118,6 +123,21 @@ Consumers do not need pnpm, workflow implementation scripts, or a gh-aw
 compiler. Your repository's PR-admission settings remain yours: the workflow
 repository's collaborator-only policy is not a consumer prerequisite. Native
 gh-aw actor authorization remains.
+
+### Extra network access
+
+The default sandbox allowlist includes Tavily (`mcp.tavily.com`) and gh-aw's
+`github` domain group, including GitHub documentation and raw file hosts. To
+allow other sources, set `AI_REVIEW_NETWORK_ALLOWED`, or pass `network_allowed`
+directly in the caller. For example, `node,python,docs.example.com` adds the Node
+and Python ecosystem domains plus a project-specific documentation host.
+
+Entries are comma-separated; domains also allow their subdomains. Additions are
+combined with the defaults, not substituted for them. Use trusted caller
+configuration or repository variables, not PR-provided content. This input
+extends sandbox network access; it does not provide credentials or change GitHub
+permissions. See gh-aw's [network reference](https://github.github.com/gh-aw/reference/network/#caller-extensible-allowlist-networkallowed-input)
+for supported ecosystem identifiers and domain syntax.
 
 ## Verify and require the gate
 
