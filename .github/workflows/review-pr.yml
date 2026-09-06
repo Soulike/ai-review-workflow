@@ -27,5 +27,6 @@ jobs:
       review-prompt-path: ""
       model: ${{ vars.AI_REVIEW_MODEL || 'auto' }}
       reasoning-effort: ${{ vars.AI_REVIEW_REASONING_EFFORT }}
+      network_allowed: ${{ vars.AI_REVIEW_NETWORK_ALLOWED }}
     secrets:
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}

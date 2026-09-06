@@ -63,7 +63,8 @@ mcp-servers:
     allowed: [tavily_search, tavily_extract]
 
 network:
-  allowed: [mcp.tavily.com]
+  allowed: [github, mcp.tavily.com]
+  allowed-input: true
 
 runtimes:
   node:
