@@ -8,7 +8,7 @@ and optional review criteria, without installing or maintaining the
 implementation.
 
 - [Set up a consumer repository](docs/consumer-setup.md)
-- [Development and operations](CONTRIBUTING.md)
+- [Contribute to the workflow](CONTRIBUTING.md)
 - [Domain language](CONTEXT.md) and [architectural decisions](docs/adr/)
 
 Consumers follow `main`; review Skills and reference material follow latest

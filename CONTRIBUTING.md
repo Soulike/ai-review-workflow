@@ -1,61 +1,47 @@
-# Development and operations
+# Contributing
+
+This guide covers changing and validating the shared workflow. To use it in
+another repository, follow the [consumer setup guide](docs/consumer-setup.md).
+
+## Before you start
+
+Use [GitHub Issues](https://github.com/Soulike/ai-review-workflow/issues) for bug
+reports, requests, and engineering specifications. Pull requests are for
+implementation changes and can only be opened by this repository's
+collaborators. This restriction does not apply to issues, comments, or consumer
+repositories.
+
+Read the [domain language](CONTEXT.md) and relevant
+[architectural decisions](docs/adr/) before changing behavior. Work on a branch
+from current `main`; changes to `main` go through pull requests. Preserve
+applicable copyright and permission notices when reusing code or documentation.
+
+## Set up the development environment
 
 Use current Node LTS (`nvm use` reads `.nvmrc`) and the pnpm version declared in
-`package.json`. The Node engine minimum describes supported language features,
-not a fixed CI selection. Authored Actions use version tags; consumers use
-`main`.
-
-## Local validation
+[`package.json`](package.json). The Node engine minimum describes supported
+language features, not a fixed CI selection.
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
-pnpm test
-pnpm typecheck
-pnpm lint
-pnpm format:check
 ```
 
-`pnpm lint:fix` and `pnpm format` explicitly edit local files. ESLint owns code
-quality and TypeScript rules; Prettier owns formatting. Node executes TypeScript
-through type stripping; `tsc` checks it separately.
-
-For full validation, install official gh-aw **v0.88.2** and **actionlint
-v1.7.12**. If gh-aw is not already installed:
+Workflow validation also needs Git, GitHub CLI, gh-aw **v0.88.2**, and
+**actionlint v1.7.12**. If the gh-aw extension is not already installed:
 
 ```sh
 gh extension install github/gh-aw --pin v0.88.2
 ```
 
-If another version is installed, select an isolated official release binary
-using the absolute `GH_AW_COMPILER` path. The compiler check rejects version
-mismatches. Install actionlint from its
+If another gh-aw version is installed, select an isolated official release
+binary using the absolute `GH_AW_COMPILER` path. The compiler check rejects
+version mismatches. Install actionlint from its
 [official release](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) and
 verify the archive against published checksums. `ACTIONLINT` may select an
 isolated binary. `pnpm tools:setup` provisions the Linux GitHub Actions runner,
 not a developer machine.
 
-```sh
-pnpm workflows:compile
-pnpm workflows:lint
-pnpm check
-```
-
-Commit source and generated files together. `workflows:check` recompiles and
-rejects modified, deleted, or untracked generated artifacts relative to Git. A
-newly generated artifact must be committed before the drift check can pass.
-`check` runs typechecking, ESLint, Prettier, Node tests, compilation/drift
-validation, and actionlint. Read-only candidate PR CI invokes these same package
-scripts with no review credentials.
-
-The compiler's `--validate` does not invoke actionlint. `workflows:lint` does so
-explicitly, with shellcheck disabled and narrow compatibility exclusions for the
-new `copilot-requests`/`vulnerability-alerts` permission names,
-`job.workflow_repository`/`job.workflow_sha`, and concurrency `queue`. These
-documented GitHub.com features postdate actionlint 1.7.12. Recheck and remove
-exclusions on upgrade, without suppressing unrelated syntax/permission errors.
-Compiler schema and template-injection validation still run.
-
-## Repository layout
+## Find the code to change
 
 This repository ships a reusable workflow, not a published JavaScript library.
 
@@ -72,125 +58,136 @@ docs/                 Consumer setup, repository conventions, and decisions
 package.json          Shared local/CI command entrypoints
 ```
 
-`src/` owns reusable behavior: input validation, Git preparation, structured review
-results, and compiler invocation. These
-modules may perform I/O; the distinction is that callers import their functions
-or classes instead of starting them as commands. `config.ts` decodes the event's
-base/head SHAs and PR number, while `configuration.ts` validates consumer review
-settings and reads the repository prompt.
+Put validation, Git preparation, structured-result handling, and compiler
+invocation behavior in `src/`. These modules may perform I/O; their defining
+feature is that callers import them rather than launch them as commands.
+[`config.ts`](src/config.ts) decodes event revisions and the PR number;
+[`configuration.ts`](src/configuration.ts) validates consumer settings and reads
+the repository prompt.
 
-`scripts/` adapts that behavior to a process: command-line arguments,
-environment variables, workflow files/outputs, diagnostics, and exit status. It
-also contains runner-specific shell operations, such as installing validation
-tools and checking Git credentials. Run these through the package scripts or
-workflow steps; production modules in `src/` do not import executable
+Put command-line arguments, environment mappings, workflow outputs, diagnostics,
+and exit status in `scripts/`. It also owns runner-specific shell operations.
+For example, [`write-review-result.ts`](scripts/write-review-result.ts) reads
+and writes files while [`review-result.ts`](src/review-result.ts) validates the
+safe-output data. Production modules in `src/` do not import executable
 entrypoints.
 
-For example, `pnpm preflight` starts `scripts/preflight.ts`, which reads
-arguments and environment variables and calls `src/configuration.ts`. The custom
-safe-output job starts `scripts/write-review-result.ts`, which reads the Agent
-artifact and calls `src/review-result.ts` to validate and extract the verdict.
-`scripts/review-gate.ts` checks prerequisite job results, reads that structured
-artifact, and applies the verdict; it does not call GitHub APIs. Put a changed
-validation or verdict rule in `src/`; put a changed environment mapping or
-process diagnostic in `scripts/`; put triggers, permissions, job dependencies,
-and reviewer instructions in the workflow files.
+Put triggers, permissions, job dependencies, and reviewer instructions in the
+workflow sources. The public interface calls the same-revision compiled engine
+and forwards only the Tavily secret, keeping compiler-added `aw_context` and
+optional token overrides out of the consumer interface. Update the
+[consumer guide](docs/consumer-setup.md) when changing that interface or its
+observable behavior.
 
-Tests live under `src/` and are discovered by `pnpm test`. Most are adjacent to
-the module they exercise. The `*-cli.test.ts` files execute command entrypoints;
-`workflow.test.ts` executes the installer/launcher fragments from the compiled
-workflow and checks the documented caller example. Neither is a local GitHub Actions
-emulator.
+## Change and compile workflows
 
-## Implementation boundaries
+Edit `review.md`, then regenerate the executable workflow:
 
-The public interface calls the same-revision compiled engine and forwards only
-Tavily, isolating compiler-added `aw_context` and optional token overrides from
-consumer configuration. `review.lock.yml`, `.github/aw/`, and generated
-attributes are generated by the compilation pipeline. gh-aw resolves source action tags to hashes; do
-not hand-maintain or reformat generated hashes.
+```sh
+pnpm workflows:compile
+```
 
-`network.allowed` in `review.md` owns the default sandbox domain list. The native
-`network.allowed-input` option adds the compiled `network_allowed` input, which
-the public interface forwards unchanged. gh-aw merges consumer additions before
-starting the firewall; this repository does not maintain a separate domain parser.
+Review and commit the source and generated changes together. `review.lock.yml`,
+`.github/aw/`, and generated entries in `.gitattributes` are compiler-owned.
+Authored Actions use version tags; gh-aw resolves those tags to hashes. Do not
+hand-edit or reformat generated artifacts.
 
-The reviewer uses exact consumer-base instructions and separate implementation
-assets. Automatic checkout is disabled because this compiler cannot infer the
-caller's target-event checkout protection from `workflow_call`. Explicit
-pre-Agent checkouts select trusted revisions, and no consumer dependencies are
-installed. CI alone executes candidate tests. Broad sandbox tools remain;
-non-execution of PR code is an instruction, not a technical confinement
-guarantee.
+When changing workflow setup, preserve these implementation constraints:
 
-Keep compiler/runtime versions coordinated. The small custom Copilot launcher
-forwards validated reasoning effort safely because this compiler cannot compile
-a dynamic `engine.args` expression. A custom command disables gh-aw's automatic
-CLI installation, so a pre-Agent step explicitly invokes the same gh-aw
-installer with the selected version and stages the binary on its read-only
-runtime mount. The compiled installation/staging and launcher argument path are
-tested.
+- Explicit pre-Agent checkouts select consumer-base instructions separately
+  from implementation assets. Automatic checkout is disabled because gh-aw
+  cannot infer the caller's target-event checkout protection from `workflow_call`.
+  Do not install consumer dependencies or ask the reviewer to run candidate
+  code. Candidate tests belong to separate CI; broad sandbox tools remain, so
+  the non-execution rule is an instruction, not a technical barrier.
+- The custom Copilot launcher passes validated reasoning effort because this
+  compiler cannot compile a dynamic `engine.args` expression. A custom command
+  disables automatic CLI installation, so the pre-Agent step invokes gh-aw's
+  installer and stages the selected binary on the read-only runtime mount.
+  Keep compiler/runtime versions coordinated in
+  [`compiler-contract.ts`](src/compiler-contract.ts) and workflow setup.
+- `network.allowed` in `review.md` owns the defaults. Native
+  `network.allowed-input` adds the `network_allowed` input; the public interface
+  forwards it unchanged and gh-aw merges additions before starting the firewall.
 
-The custom `record_review_verdict` safe output carries only `approved` or
-`needs-change`. Its job validates one completed COMMENT review and one verdict,
-rejects incomplete/error signals, and uploads `review-result.json`. Only after
-this job succeeds do built-in safe outputs publish the review and inline
-comments. The gate reads the result artifact and prerequisite job outcomes,
-never review prose, attribution
-markers, or current PR state. Finding severity and totals are review content;
-the Agent applies the high/medium rule, not a Markdown parser.
+For verdict and publication changes, preserve the
+[stateless structured-result contract](docs/adr/0008-use-stateless-structured-review-results.md).
+The gate consumes the result artifact and prerequisite job outcomes, not review
+prose or current PR state.
 
-## Choosing and validating tests
+## Test and validate your change
 
-Keep tests that exercise an owned behavior and detect a distinct realistic
-fault: validating structured input, fetching Git evidence, or running a command with the right
-arguments and failure status. Test detailed decisions at the module that owns
-them; use executable entrypoint tests for process contracts and cross-module
-wiring.
+Before committing, run the individual checks after regenerating any affected
+workflow artifacts:
+
+```sh
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm test
+pnpm workflows:lint
+```
+
+Node executes TypeScript through type stripping; `tsc` checks types separately.
+ESLint owns code quality and TypeScript rules; Prettier owns formatting.
+`pnpm lint:fix` and `pnpm format` explicitly edit local files.
+
+Compilation validates the gh-aw schema and template expressions, but does not
+run actionlint. `workflows:lint` invokes it separately, with shellcheck disabled
+and narrow compatibility exclusions in
+[`lint-workflows.ts`](scripts/lint-workflows.ts). Recheck those exclusions when
+upgrading actionlint; remove obsolete ones without suppressing unrelated errors.
+
+After committing source and generated changes, run the full CI check:
+
+```sh
+pnpm check
+```
+
+This repeats the checks above and runs `workflows:check`, which recompiles and
+rejects any modified, deleted, or untracked generated artifacts relative to
+`HEAD`. Correct but uncommitted generated changes also fail this check; staging
+them is not sufficient. If compilation produces further changes, inspect and
+commit them with the corresponding source before rerunning `pnpm check`.
+
+### Choose useful tests
+
+Tests live under `src/`, usually beside the module they exercise, and are
+discovered by `pnpm test`. Use module tests for owned decisions and `*-cli.test.ts`
+tests for process contracts and cross-module wiring. Each test should detect a
+distinct realistic fault. Keep independent expected results and a valid control
+alongside rejection cases; identify what protection remains before removing or
+consolidating a test.
 
 Do not duplicate workflow literals in Node assertions as a substitute for
-testing GitHub behavior. Compilation and actionlint validate workflow structure;
-review the configuration and verify checkout revisions, effective permissions,
-cancellation, job ordering, and publication on GitHub. Script-fragment tests
-prove only the locally executed code, not how GitHub supplies its context or
-schedules it. The caller-example comparison protects documentation consistency,
-not execution.
+testing GitHub behavior. [`workflow.test.ts`](src/workflow.test.ts) executes
+installer/launcher fragments and checks the documented caller; it does not
+emulate Actions. Local tests cannot establish live inference, authorization,
+checkout context, scheduling, or publication. Exact model prose is not a golden
+test oracle.
 
-Before removing or consolidating a test, identify what protection remains. For
-example, compiler tests execute both the standalone binary path and `gh aw`, and
-the drift test runs `scripts/check.ts` in a temporary Git repository whose
-compiler changes generated files. Assertions about those child-process results
-protect more than a second copy of the helper's return object. Keep an
-independent expected result and a valid control alongside rejection cases. Exact
-model prose is not a golden test oracle, and local tests do not establish live
-inference or authorization.
+## Submit and verify a pull request
 
-## Activation and main recovery
+Explain the change and its validation in the PR, and link its issue when
+applicable. Candidate CI runs the package checks against proposed code with
+read-only permissions and no review credentials. The PR merge box and
+[repository rules](https://github.com/Soulike/ai-review-workflow/rules) define
+the required checks and human approvals. A passing AI review gate is not a
+human approval or permission to merge.
 
-This repository uses the public `@main` interface for self-review. Bootstrap
-with candidate CI and human review/merge. Then exercise a fresh real PR using
-the [first-run checks](docs/consumer-setup.md#verify-and-require-the-gate)
-before requiring the observed gate. Record the run URL, event revisions,
-implementation SHA, and structured verdict separately from workflow health in
-the delivery issue/PR. Local tests or an old deployed review
-cannot prove activation.
+Consumers, including this repository, use `@main`; there is no release or
+version-bump process. Self-review exercises the deployed workflow, not the
+workflow changes proposed in that PR. After merging execution changes, verify
+a fresh PR run using the
+[live verification checklist](docs/consumer-setup.md#verify-and-require-the-gate).
+Record its run URL, event revisions, implementation SHA, and structured verdict
+in the issue or PR, distinguishing review content from workflow health.
 
-The repository policy is public MIT distribution with collaborator-only PR
-creation. It does not restrict downstream repos, issues, or comments. Once
-activation is complete, main requires PRs and the observed candidate/review
-checks. A single-maintainer project need not add a human approval count merely
-to enforce PR-only changes.
-
-For a broken `main`, prepare a focused fix/revert on a branch, run candidate CI,
-and obtain human review/merge. If the deployed reviewer blocks recovery, an
-authorized maintainer may temporarily relax only its required-check rule,
-retaining PR-required changes and candidate CI. Record the reason, merge the
-reviewed repair, verify a fresh deployed run, then restore/recheck the exact
-required review check. Do not add automatic bypasses or direct pushes to main.
-
-Each workflow run is independent. Failed jobs can reuse successful jobs and
-run-local artifacts. The verdict artifact is retained for 30 days; there is no
-original-attempt equality guard,
-cross-run reconciliation, or duplicate-comment cleanup. Missing or expired
-artifacts require a full rerun. A rerun keeps the original event; request a new
-PR event to review a new head.
+For failed runs, use the
+[rerun and artifact guidance](docs/consumer-setup.md#drafts-changes-and-recovery).
+If broken `main` prevents a repair PR from passing review, an authorized
+maintainer may temporarily relax only the review's required-check rule. Keep
+PR-required changes and candidate CI, record the reason, and obtain human
+review/merge of a focused fix or revert. Verify a fresh deployed run before
+restoring and rechecking the required review check. Do not add automatic
+bypasses or push repairs directly to `main`.
