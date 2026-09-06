@@ -1,154 +1,24 @@
-const SHA_PATTERN = /^[0-9a-f]{40}$/u;
-const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
-
 export type ReviewConfig = {
   baseSha: string;
   expectedHeadSha: string;
   prNumber: number;
-  prUrl: string;
-  repository: string;
-  runAttempt: number;
-  runId: number;
 };
-
-export const reviewEventActions = [
-  "converted_to_draft",
-  "opened",
-  "ready_for_review",
-  "reopened",
-  "synchronize",
-] as const;
-
-export type ReviewJobResult = "cancelled" | "failure" | "skipped" | "success";
-
-export type ReviewEventContext = {
-  action: (typeof reviewEventActions)[number];
-  agentJobResult: ReviewJobResult;
-  isDraft: boolean;
-  safeOutputsJobResult: ReviewJobResult;
-};
-
-function required(environment: NodeJS.ProcessEnv, name: string): string {
-  const value = environment[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is required.`);
-  }
-  return value;
-}
-
-export function positiveInteger(value: string, name: string): number {
-  if (!/^[1-9][0-9]*$/u.test(value)) {
-    throw new Error(`${name} must be a positive integer.`);
-  }
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed)) {
-    throw new Error(`${name} exceeds the supported integer range.`);
-  }
-  return parsed;
-}
-
-export function sha(value: string, name: string): string {
-  if (!SHA_PATTERN.test(value)) {
-    throw new Error(`${name} must be a lowercase 40-character Git SHA.`);
-  }
-  return value;
-}
-
-function jobResult(
-  environment: NodeJS.ProcessEnv,
-  name: string,
-): ReviewJobResult {
-  const value = required(environment, name);
-  const result = (["cancelled", "failure", "skipped", "success"] as const).find(
-    (candidate) => candidate === value,
-  );
-  if (!result) {
-    throw new Error(`${name} must be cancelled, failure, skipped, or success.`);
-  }
-  return result;
-}
 
 export function readReviewConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): ReviewConfig {
-  const repository = required(environment, "AI_REVIEW_REPOSITORY");
-  if (!REPOSITORY_PATTERN.test(repository)) {
-    throw new Error("AI_REVIEW_REPOSITORY must use the owner/name form.");
-  }
-
-  const prNumber = positiveInteger(
-    required(environment, "AI_REVIEW_PR_NUMBER"),
-    "AI_REVIEW_PR_NUMBER",
-  );
-
-  const prUrl = required(environment, "AI_REVIEW_PR_URL");
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(prUrl);
-  } catch {
-    throw new Error("AI_REVIEW_PR_URL must be an absolute URL.");
-  }
-  if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "github.com") {
-    throw new Error("AI_REVIEW_PR_URL must be an HTTPS github.com URL.");
-  }
-  const expectedPath = `/${repository}/pull/${prNumber}`.toLowerCase();
+  const baseSha = environment.AI_REVIEW_BASE_SHA ?? "";
+  const expectedHeadSha = environment.AI_REVIEW_HEAD_SHA ?? "";
+  const number = environment.AI_REVIEW_PR_NUMBER ?? "";
   if (
-    parsedUrl.pathname.replace(/\/$/u, "").toLowerCase() !== expectedPath ||
-    parsedUrl.username ||
-    parsedUrl.password ||
-    parsedUrl.port ||
-    parsedUrl.search ||
-    parsedUrl.hash
+    !/^[0-9a-f]{40}$/u.test(baseSha) ||
+    !/^[0-9a-f]{40}$/u.test(expectedHeadSha)
   ) {
-    throw new Error(
-      "AI_REVIEW_PR_URL must identify AI_REVIEW_PR_NUMBER in AI_REVIEW_REPOSITORY.",
-    );
+    throw new Error("Base and head must be lowercase 40-character Git SHAs.");
   }
-
-  return {
-    baseSha: sha(
-      required(environment, "AI_REVIEW_BASE_SHA"),
-      "AI_REVIEW_BASE_SHA",
-    ),
-    expectedHeadSha: sha(
-      required(environment, "AI_REVIEW_HEAD_SHA"),
-      "AI_REVIEW_HEAD_SHA",
-    ),
-    prNumber,
-    prUrl,
-    repository,
-    runAttempt: positiveInteger(
-      required(environment, "GITHUB_RUN_ATTEMPT"),
-      "GITHUB_RUN_ATTEMPT",
-    ),
-    runId: positiveInteger(
-      required(environment, "GITHUB_RUN_ID"),
-      "GITHUB_RUN_ID",
-    ),
-  };
-}
-
-export function readReviewEvent(
-  environment: NodeJS.ProcessEnv = process.env,
-): ReviewEventContext {
-  const value = required(environment, "AI_REVIEW_EVENT_ACTION");
-  const action = reviewEventActions.find((candidate) => candidate === value);
-  if (!action) {
-    throw new Error(
-      `AI_REVIEW_EVENT_ACTION must be one of: ${reviewEventActions.join(", ")}.`,
-    );
+  const prNumber = Number(number);
+  if (!/^[1-9][0-9]*$/u.test(number) || !Number.isSafeInteger(prNumber)) {
+    throw new Error("PR number must be a positive safe integer.");
   }
-  const draft = required(environment, "AI_REVIEW_PR_DRAFT");
-  if (draft !== "true" && draft !== "false") {
-    throw new Error("AI_REVIEW_PR_DRAFT must be true or false.");
-  }
-  return {
-    action,
-    agentJobResult: jobResult(environment, "AI_REVIEW_AGENT_RESULT"),
-    isDraft: draft === "true",
-    safeOutputsJobResult: jobResult(
-      environment,
-      "AI_REVIEW_SAFE_OUTPUTS_RESULT",
-    ),
-  };
+  return { baseSha, expectedHeadSha, prNumber };
 }

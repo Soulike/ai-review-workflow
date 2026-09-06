@@ -20,9 +20,6 @@
     "workflows:lint": "node scripts/lint-workflows.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm workflows:check && pnpm workflows:lint"
   },
-  "dependencies": {
-    "@octokit/rest": "^22.0.1"
-  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.13.3",

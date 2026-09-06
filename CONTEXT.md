@@ -16,5 +16,5 @@ verdict rules.
 distinct from execution status and a human's approval or merge decision. A
 review that was not completed has no review verdict.
 
-**Review gate**: The required check that authenticates a review result and
+**Review gate**: The required check that reads a completed workflow run's review result and
 reports whether it satisfies the review requirement.
