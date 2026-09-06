@@ -1,16 +1,20 @@
 # Own the review pipeline in a reusable workflow
 
+The verdict-authentication aspects of this decision were superseded by
+[ADR 0008](0008-use-stateless-structured-review-results.md). Reusable pipeline
+ownership remains unchanged; the original decision is recorded below.
+
 The review pipeline is distributed through a reusable GitHub workflow plus
 consumer configuration, rather than copied implementation scripts or an
 installation Skill. The reusable workflow owns setup, review execution, safe
-publication, and structured verdict handling; consumer repositories supply settings,
+publication, and verdict authentication; consumer repositories supply settings,
 credentials, and repository-specific review criteria. This keeps consumers from
 having to compile the workflow, install its implementation dependencies, or
 maintain their own review gate.
 
 ## Consequences
 
-Caller-facing results are the required review check and the consolidated
+Caller-facing results are the authenticated required check and the consolidated
 pull-request review with inline comments. A declared workflow result output and
 automatic operational issue reporting are outside the consumer interface.
 
