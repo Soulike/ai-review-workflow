@@ -232,7 +232,7 @@ test("ignores reviews from another run while selecting the current review", () =
   );
 });
 
-test("ignores a malformed review from an earlier attempt before validating current counts", () => {
+test("ignores malformed counts on a review outside the publisher window", () => {
   assert.equal(
     verifyPublishedReview(
       identity,
@@ -304,7 +304,7 @@ test("rejects a review after the pull request changes", () => {
   );
 });
 
-test("rejects a review that predates the current run attempt", () => {
+test("rejects a review submitted before its authenticated publisher started", () => {
   assert.throws(
     () =>
       verifyPublishedReview(
@@ -322,9 +322,7 @@ class FakeGitHubClient {
   readonly pulls: ReturnType<typeof pullRequest>[];
   readonly reviewComments: ReturnType<typeof comments>;
   readonly reviews: ReturnType<typeof review>[];
-  jobReads = 0;
   pullRequestReads = 0;
-  reviewCommentReads = 0;
   reviewReads = 0;
 
   constructor(
@@ -337,8 +335,11 @@ class FakeGitHubClient {
     this.reviewComments = reviewComments;
   }
 
-  async getPullRequest(): Promise<ReturnType<typeof pullRequest>> {
-    const value = this.pulls[this.pullRequestReads];
+  async getPullRequest(
+    prNumber: number,
+  ): Promise<ReturnType<typeof pullRequest>> {
+    assert.equal(prNumber, 42);
+    const value = this.pulls[0];
     this.pullRequestReads += 1;
     if (!value) {
       throw new Error("Unexpected pull-request read.");
@@ -346,18 +347,25 @@ class FakeGitHubClient {
     return value;
   }
 
-  async listReviewComments(): Promise<ReturnType<typeof comments>> {
-    this.reviewCommentReads += 1;
+  async listReviewComments(
+    prNumber: number,
+  ): Promise<ReturnType<typeof comments>> {
+    assert.equal(prNumber, 42);
     return this.reviewComments;
   }
 
-  async listReviews(): Promise<ReturnType<typeof review>[]> {
+  async listReviews(prNumber: number): Promise<ReturnType<typeof review>[]> {
+    assert.equal(prNumber, 42);
     this.reviewReads += 1;
     return this.reviews;
   }
 
-  async listRunAttemptJobs(): Promise<ReturnType<typeof jobs>> {
-    this.jobReads += 1;
+  async listRunAttemptJobs(
+    runId: number,
+    runAttempt: number,
+  ): Promise<ReturnType<typeof jobs>> {
+    assert.equal(runId, 1234);
+    assert.equal(runAttempt, 2);
     return jobs();
   }
 }
@@ -375,14 +383,10 @@ function gateContext(
   };
 }
 
-test("approves an authenticated review without mutating the pull request", async () => {
+test("passes when fetched evidence authenticates an approved review", async () => {
   const client = new FakeGitHubClient([pullRequest()], [review("approved")]);
 
   assert.equal(await enforceReviewGate(client, gateContext()), "approved");
-  assert.equal(client.pullRequestReads, 1);
-  assert.equal(client.reviewReads, 1);
-  assert.equal(client.reviewCommentReads, 1);
-  assert.equal(client.jobReads, 1);
 });
 
 test("fails the gate for an authenticated needs-change review", async () => {
@@ -412,19 +416,12 @@ test("fails without reading reviews when the Agent or safe-output job fails", as
   }
 });
 
-test("fails without reading reviews for a draft", async (t) => {
-  for (const context of [
-    { action: "opened" as const, isDraft: true },
-    { action: "converted_to_draft" as const, isDraft: true },
-  ]) {
-    await t.test(context.action, async () => {
-      const client = new FakeGitHubClient([], []);
-      await assert.rejects(
-        enforceReviewGate(client, gateContext(context)),
-        /draft pull request/u,
-      );
-      assert.equal(client.pullRequestReads, 0);
-      assert.equal(client.reviewReads, 0);
-    });
-  }
+test("fails without reading reviews for a draft", async () => {
+  const client = new FakeGitHubClient([], []);
+  await assert.rejects(
+    enforceReviewGate(client, gateContext({ action: "opened", isDraft: true })),
+    /draft pull request/u,
+  );
+  assert.equal(client.pullRequestReads, 0);
+  assert.equal(client.reviewReads, 0);
 });

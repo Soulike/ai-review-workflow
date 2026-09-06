@@ -17,14 +17,12 @@ function jsonResponse(value: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(value), { ...init, headers });
 }
 
-test("reads later job pages and fails on an incomplete page or API denial", async (t) => {
+test("maps exact-attempt jobs across pages and rejects an incomplete page", async (t) => {
   const urls: string[] = [];
   let mode = "complete";
   mockFetch(t, async (input) => {
     const url = String(input);
     urls.push(url);
-    if (mode === "denied")
-      return jsonResponse({ message: "denied" }, { status: 403 });
     const pageTwo = url.includes("page=2");
     return jsonResponse({
       total_count: 2,
@@ -45,9 +43,29 @@ test("reads later job pages and fails on an incomplete page or API denial", asyn
     });
   });
   const client = new GitHubClient("token", "owner/repository");
-  assert.deepEqual(
-    (await client.listRunAttemptJobs(1234, 2)).map((job) => job.checkRunId),
-    [11, 12],
+  assert.deepEqual(await client.listRunAttemptJobs(1234, 2), [
+    {
+      id: 1,
+      checkRunId: 11,
+      name: "Nested / safe_outputs",
+      status: "completed",
+      conclusion: "success",
+      startedAt: "2026-09-02T10:00:00Z",
+      completedAt: "2026-09-02T10:01:00Z",
+    },
+    {
+      id: 2,
+      checkRunId: 12,
+      name: "Nested / safe_outputs",
+      status: "completed",
+      conclusion: "success",
+      startedAt: "2026-09-02T10:00:00Z",
+      completedAt: "2026-09-02T10:01:00Z",
+    },
+  ]);
+  assert.equal(
+    urls[0],
+    "https://api.github.com/repos/owner/repository/actions/runs/1234/attempts/2/jobs?per_page=100",
   );
   assert.ok(urls[1]?.includes("attempts/2/jobs?per_page=100&page=2"));
   mode = "incomplete";
@@ -55,8 +73,6 @@ test("reads later job pages and fails on an incomplete page or API denial", asyn
     client.listRunAttemptJobs(1234, 2),
     /Incomplete job pagination/u,
   );
-  mode = "denied";
-  await assert.rejects(client.listReviews(42), /denied/u);
 });
 
 test("maps pull-request identity through the Octokit REST endpoint", async (t) => {
@@ -93,8 +109,9 @@ test("maps pull-request identity through the Octokit REST endpoint", async (t) =
   });
 });
 
-test("uses Octokit pagination and preserves submitted review identity", async (t) => {
+test("preserves paginated review identity and rejects later-page errors", async (t) => {
   let requestCount = 0;
+  let failLaterPage = false;
   mockFetch(t, async () => {
     requestCount += 1;
     if (requestCount === 1) {
@@ -117,6 +134,8 @@ test("uses Octokit pagination and preserves submitted review identity", async (t
         },
       );
     }
+    if (failLaterPage)
+      return jsonResponse({ message: "denied" }, { status: 403 });
     return jsonResponse(
       [
         {
@@ -154,50 +173,10 @@ test("uses Octokit pagination and preserves submitted review identity", async (t
       submittedAt: "2026-09-02T09:00:00Z",
     },
   ]);
-});
-
-test("reads the exact run-attempt jobs used to authenticate publication", async (t) => {
-  let capturedUrl = "";
-  mockFetch(t, async (input) => {
-    capturedUrl = String(input);
-    return jsonResponse(
-      {
-        jobs: [
-          {
-            completed_at: "2026-09-02T10:01:00Z",
-            conclusion: "success",
-            id: 77,
-            check_run_url:
-              "https://api.github.com/repos/owner/repository/check-runs/88",
-            name: "safe_outputs",
-            started_at: "2026-09-02T10:00:00Z",
-            status: "completed",
-          },
-        ],
-        total_count: 1,
-      },
-      { status: 200 },
-    );
-  });
-  const client = new GitHubClient("token", "owner/repository");
-
-  const jobs = await client.listRunAttemptJobs(1234, 2);
-
-  assert.equal(
-    capturedUrl,
-    "https://api.github.com/repos/owner/repository/actions/runs/1234/attempts/2/jobs?per_page=100",
-  );
-  assert.deepEqual(jobs, [
-    {
-      completedAt: "2026-09-02T10:01:00Z",
-      conclusion: "success",
-      id: 77,
-      checkRunId: 88,
-      name: "safe_outputs",
-      startedAt: "2026-09-02T10:00:00Z",
-      status: "completed",
-    },
-  ]);
+  requestCount = 0;
+  failLaterPage = true;
+  await assert.rejects(client.listReviews(42), /denied/u);
+  assert.equal(requestCount, 2);
 });
 
 test("paginates inline review comments and preserves their review identity", async (t) => {

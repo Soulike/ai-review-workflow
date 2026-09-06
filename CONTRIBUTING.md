@@ -55,33 +55,66 @@ documented GitHub.com features postdate actionlint 1.7.12. Recheck and remove
 exclusions on upgrade, without suppressing unrelated syntax/permission errors.
 Compiler schema and template-injection validation still run.
 
+## Repository layout
+
+This repository ships a reusable workflow, not a published JavaScript library.
+
+```text
+.github/workflows/
+  ai-review.yml       Public reusable interface; forwards inputs and secrets
+  review.md           Review prompt and orchestration source
+  review.lock.yml     Compiled executable workflow; do not edit by hand
+  review-pr.yml       This repository's caller of the public interface
+  ci.yml              Candidate-code validation
+src/                  Importable implementation modules and Node tests
+scripts/              Executable command entrypoints and runner setup scripts
+docs/                 Consumer setup, repository conventions, and decisions
+package.json          Shared local/CI command entrypoints
+```
+
+`src/` owns reusable behavior: input validation, Git preparation, review
+parsing, gate decisions, GitHub API access, and compiler invocation. These
+modules may perform I/O; the distinction is that callers import their functions
+or classes instead of starting them as commands. `config.ts` decodes trusted
+PR/run/event identity, while `configuration.ts` validates consumer review
+settings and reads the repository prompt.
+
+`scripts/` adapts that behavior to a process: command-line arguments,
+environment variables, workflow files/outputs, diagnostics, and exit status. It
+also contains runner-specific shell operations, such as installing validation
+tools and checking Git credentials. Run these through the package scripts or
+workflow steps; production modules in `src/` do not import executable
+entrypoints.
+
+For example, `pnpm preflight` starts `scripts/preflight.ts`, which reads
+arguments and environment variables and calls `src/configuration.ts`. The gate
+job starts `scripts/review-gate.ts`, which assembles context and calls
+`src/review-gate.ts` with the API client from `src/github.ts`. Put a changed
+validation or verdict rule in `src/`; put a changed environment mapping or
+process diagnostic in `scripts/`; put triggers, permissions, job dependencies,
+and reviewer instructions in the workflow files.
+
+Tests live under `src/` and are discovered by `pnpm test`. Most are adjacent to
+the module they exercise. The `*-cli.test.ts` files execute command entrypoints;
+`workflow.test.ts` executes owned script fragments from the compiled workflow
+and checks the documented caller example. Neither is a local GitHub Actions
+emulator.
+
 ## Implementation boundaries
 
-- `.github/workflows/ai-review.yml` owns the public three-input interface. It
-  calls the same-revision compiled engine and forwards only Tavily, isolating
-  compiler-added `aw_context` and optional token overrides from public config.
-- `.github/workflows/review.md` owns the shared prompt and orchestration.
-  `review.lock.yml`, `.github/aw/`, and generated attributes are compiler-owned.
-  gh-aw resolves source action tags to hashes; do not hand-maintain or reformat
-  generated hashes.
-- `src/` owns input preparation, Git evidence, review parsing/authentication,
-  GitHub access, and compiler invocation. `scripts/` owns executable entrypoints
-  and runner setup.
-- The reviewer uses exact consumer-base instructions and separate implementation
-  assets. Automatic checkout is disabled: a reusable `workflow_call` does not
-  give this compiler the caller's target-event checkout protection. Explicit
-  pre-Agent checkouts select only trusted revisions; compiled tests reject the
-  PR-head checkout helper. It installs no consumer dependencies. CI alone
-  executes candidate tests. Broad sandbox tools remain; non-execution of PR code
-  is an instruction, not a technical confinement guarantee.
+The public interface calls the same-revision compiled engine and forwards only
+Tavily, isolating compiler-added `aw_context` and optional token overrides from
+consumer configuration. `review.lock.yml`, `.github/aw/`, and generated
+attributes are compiler-owned. gh-aw resolves source action tags to hashes; do
+not hand-maintain or reformat generated hashes.
 
-Tests cover review parsing, gate decisions, base prompt selection, real Git
-fetching without head checkout, executable argument/error handling, real Octokit
-pagination with controlled HTTP responses, publication identity, counts,
-lifecycle state, and current-attempt enforcement. Cross-field tests check
-compiled wiring. None substitutes for live inference, authorization,
-publication, or cross-repository validation; exact model prose is not a golden
-test oracle.
+The reviewer uses exact consumer-base instructions and separate implementation
+assets. Automatic checkout is disabled because this compiler cannot infer the
+caller's target-event checkout protection from `workflow_call`. Explicit
+pre-Agent checkouts select trusted revisions, and no consumer dependencies are
+installed. CI alone executes candidate tests. Broad sandbox tools remain;
+non-execution of PR code is an instruction, not a technical confinement
+guarantee.
 
 Keep compiler/runtime versions coordinated. The small custom Copilot launcher
 forwards validated reasoning effort safely because this compiler cannot compile
@@ -92,6 +125,32 @@ runtime mount. The compiled installation/staging and launcher argument path are
 tested. A publisher pre-step records native job identity at step scope; gh-aw
 appends its footer after the Agent body. The gate does not authenticate by a
 short job name.
+
+## Choosing and validating tests
+
+Keep tests that exercise an owned behavior and detect a distinct realistic
+fault: parsing untrusted input, authenticating a result, fetching Git evidence,
+translating paginated API responses, or running a command with the right
+arguments and failure status. Test detailed decisions at the module that owns
+them; use executable entrypoint tests for process contracts and cross-module
+wiring.
+
+Do not duplicate workflow literals in Node assertions as a substitute for
+testing GitHub behavior. Compilation and actionlint validate workflow structure;
+review the configuration and verify checkout revisions, effective permissions,
+cancellation, job ordering, and publication on GitHub. Script-fragment tests
+prove only the locally executed code, not how GitHub supplies its context or
+schedules it. The caller-example comparison protects documentation consistency,
+not execution.
+
+Before removing or consolidating a test, identify what protection remains. For
+example, compiler tests execute both the standalone binary path and `gh aw`, and
+the drift test runs `scripts/check.ts` in a temporary Git repository whose
+compiler changes generated files. Assertions about those child-process results
+protect more than a second copy of the helper's return object. Keep an
+independent expected result and a valid control alongside rejection cases. Exact
+model prose is not a golden test oracle, and local tests do not establish live
+inference or authorization.
 
 ## Activation and main recovery
 
