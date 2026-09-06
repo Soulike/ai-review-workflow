@@ -39,6 +39,21 @@ test("the documented caller matches the executable self-consumer", async () => {
   assert.deepEqual(parseDocument(example).toJSON(), caller.toJSON());
 });
 
+test("the self-consumer forwards repository reasoning effort without a fallback", () => {
+  assert.equal(
+    caller.getIn(["jobs", "review", "with", "reasoning-effort"]),
+    "${{ vars.AI_REVIEW_REASONING_EFFORT }}",
+  );
+  assert.equal(
+    publicWorkflow.getIn(["jobs", "engine", "with", "reasoning-effort"]),
+    "${{ inputs.reasoning-effort }}",
+  );
+  assert.equal(
+    compiled.getIn(["env", "KESTREL_REASONING_EFFORT"]),
+    "${{ inputs.reasoning-effort }}",
+  );
+});
+
 test("the public interface forwards only the three settings and Tavily secret to its same-revision engine", () => {
   const inputs = publicWorkflow.getIn(["on", "workflow_call", "inputs"]);
   assert.ok(isMap(inputs));
@@ -298,7 +313,7 @@ test("compiled installation stages the CLI before its launcher forwards effort a
     PATH: `${binaryDir}:${process.env.PATH}`,
     RUNNER_TEMP: temporary,
     ENGINE_VERSION: "1.2.3",
-    KESTREL_REASONING_EFFORT: "high",
+    KESTREL_REASONING_EFFORT: "xhigh",
   };
   await promisify(execFile)("bash", ["-eu", "-c", installation], { env });
   const { stdout } = await promisify(execFile)(
@@ -308,7 +323,7 @@ test("compiled installation stages the CLI before its launcher forwards effort a
   );
   assert.equal(
     stdout,
-    "--reasoning-effort\nhigh\n--model\nmodel with spaces\n",
+    "--reasoning-effort\nxhigh\n--model\nmodel with spaces\n",
   );
   await assert.rejects(
     promisify(execFile)("bash", ["-c", command], {

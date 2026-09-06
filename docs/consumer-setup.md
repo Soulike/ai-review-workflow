@@ -25,6 +25,17 @@ The public interface accepts no PAT, `COPILOT_GITHUB_TOKEN` secret, or `GH_AW_*`
 token override. Only Tavily is forwarded; GitHub supplies the built-in token.
 Keep explicit secret passing rather than using `secrets: inherit`.
 
+Under Settings → Secrets and variables → Actions → Variables, configure the
+repository variables used by the caller below:
+
+- `AI_REVIEW_REASONING_EFFORT` is required. Set a concrete supported value such
+  as `high`; there is no fallback when it is unset or invalid.
+- `AI_REVIEW_MODEL` is optional. Leave it unset to use `auto`.
+
+These are non-secret settings. Both are forwarded to the reusable workflow's
+inputs; changing them does not require editing the workflow. See the
+[input contract](#configure-the-review) for supported values.
+
 ## Add the caller
 
 Commit this as `.github/workflows/review-pr.yml`. It matches
@@ -59,7 +70,7 @@ jobs:
     with:
       review-prompt-path: ""
       model: ${{ vars.AI_REVIEW_MODEL || 'auto' }}
-      reasoning-effort: high
+      reasoning-effort: ${{ vars.AI_REVIEW_REASONING_EFFORT }}
     secrets:
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
 ```
