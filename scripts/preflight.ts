@@ -10,9 +10,9 @@ try {
   if (!repositoryRoot) throw new Error("--repository-root is required.");
   await prepareReviewConfig(
     {
-      model: process.env.KESTREL_MODEL,
-      reasoningEffort: process.env.KESTREL_REASONING_EFFORT,
-      reviewPromptPath: process.env.KESTREL_REVIEW_PROMPT_PATH,
+      model: process.env.AI_REVIEW_MODEL,
+      reasoningEffort: process.env.AI_REVIEW_REASONING_EFFORT,
+      reviewPromptPath: process.env.AI_REVIEW_PROMPT_PATH,
     },
     repositoryRoot,
   );

@@ -64,7 +64,7 @@ export class GitHubClient {
           "X-GitHub-Api-Version": apiVersion,
         },
       },
-      userAgent: "kestrel-review",
+      userAgent: "ai-review-workflow",
     });
   }
 

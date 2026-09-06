@@ -1,11 +1,11 @@
 # Retain the existing Agent isolation model
 
-Kestrel v1 retains the existing gh-aw sandbox and broad Agent tool capabilities
-rather than adding a custom execution-confinement layer. This preserves reviewer
-capability while retaining the instruction that the reviewer must not execute
-PR-provided code, including its scripts, tests, hooks, or dependency-installation
-code. Running candidate tests belongs to the separate CI workflow, not the
-reviewer.
+The initial workflow retains the existing gh-aw sandbox and broad Agent tool
+capabilities rather than adding a custom execution-confinement layer. This
+preserves reviewer capability while retaining the instruction that the reviewer
+must not execute PR-provided code, including its scripts, tests, hooks, or
+dependency-installation code. Running candidate tests belongs to the separate CI
+workflow, not the reviewer.
 
 The non-execution rule is an instruction within the existing isolation model,
 not a claimed mechanical execution barrier. Sandboxing limits where code can

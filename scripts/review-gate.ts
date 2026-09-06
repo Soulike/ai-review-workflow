@@ -15,13 +15,13 @@ try {
       "AI review cannot pass for a draft pull request. Mark it ready to request a review.",
     );
   }
-  for (const name of ["KESTREL_PREPARE_RESULT", "KESTREL_GUARD_RESULT"]) {
+  for (const name of ["AI_REVIEW_PREPARE_RESULT", "AI_REVIEW_GUARD_RESULT"]) {
     if (process.env[name] !== "success")
       throw new Error(
         `${name} did not succeed (${process.env[name] ?? "missing"}). Re-run all jobs after correcting the cause.`,
       );
   }
-  if (process.env.KESTREL_PREPARE_ATTEMPT !== String(config.runAttempt)) {
+  if (process.env.AI_REVIEW_PREPARE_ATTEMPT !== String(config.runAttempt)) {
     throw new Error("Earlier inference cannot be reused. Re-run all jobs.");
   }
   const client = new GitHubClient(
@@ -32,12 +32,12 @@ try {
     ...config,
     ...event,
     callId: positiveInteger(
-      process.env.KESTREL_CALL_ID ?? "",
-      "KESTREL_CALL_ID",
+      process.env.AI_REVIEW_CALL_ID ?? "",
+      "AI_REVIEW_CALL_ID",
     ),
     implementationSha: sha(
-      process.env.KESTREL_IMPLEMENTATION_SHA ?? "",
-      "KESTREL_IMPLEMENTATION_SHA",
+      process.env.AI_REVIEW_IMPLEMENTATION_SHA ?? "",
+      "AI_REVIEW_IMPLEMENTATION_SHA",
     ),
   });
   console.log(`AI review ${result} for ${config.expectedHeadSha}.`);

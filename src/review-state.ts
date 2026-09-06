@@ -3,7 +3,7 @@ export type ReviewVerdict = (typeof reviewVerdicts)[number];
 
 export const AI_REVIEW_AUTHOR = "github-actions[bot]";
 export const AI_REVIEW_WORKFLOW_ID = "review";
-export const AI_REVIEW_WORKFLOW_NAME = "Kestrel review";
+export const AI_REVIEW_WORKFLOW_NAME = "AI review";
 export const findingSeverities = ["high", "medium", "low", "nit"] as const;
 
 export type FindingCounts = {
@@ -189,10 +189,10 @@ export function parsePublicationIdentity(body: string | null): {
   implementationSha: string;
   runAttempt: number;
 } | null {
-  if (!body || body.split("<!-- kestrel-publication:").length !== 2)
+  if (!body || body.split("<!-- ai-review-publication:").length !== 2)
     return null;
   const match =
-    /<!-- kestrel-publication: call=([1-9][0-9]*); check=([1-9][0-9]*); sha=([0-9a-f]{40}); attempt=([1-9][0-9]*) -->/u.exec(
+    /<!-- ai-review-publication: call=([1-9][0-9]*); check=([1-9][0-9]*); sha=([0-9a-f]{40}); attempt=([1-9][0-9]*) -->/u.exec(
       body,
     );
   if (!match?.[3]) return null;

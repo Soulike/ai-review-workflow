@@ -6,7 +6,7 @@ import { assertCompletePublication } from "../src/publication.ts";
 
 const config = readReviewConfig();
 const output: unknown = JSON.parse(
-  await readFile("/tmp/kestrel-publication/agent_output.json", "utf8"),
+  await readFile("/tmp/review-publication/agent_output.json", "utf8"),
 );
 assertCompletePublication(output);
 const client = new GitHubClient(
@@ -15,8 +15,8 @@ const client = new GitHubClient(
 );
 assertCurrentPullRequest(config, await client.getPullRequest(config.prNumber));
 const callId = positiveInteger(
-  process.env.KESTREL_CALL_ID ?? "",
-  "KESTREL_CALL_ID",
+  process.env.AI_REVIEW_CALL_ID ?? "",
+  "AI_REVIEW_CALL_ID",
 );
 if (!process.env.GITHUB_OUTPUT) throw new Error("GITHUB_OUTPUT is required.");
 await appendFile(process.env.GITHUB_OUTPUT, `call-id=${callId}\n`);

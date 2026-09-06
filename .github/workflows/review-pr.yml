@@ -7,7 +7,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: kestrel-pr-${{ github.event.pull_request.number }}
+  group: ai-review-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
       security-events: read
       vulnerability-alerts: read
       copilot-requests: write
-    uses: Soulike/kestrel/.github/workflows/ai-review.yml@main
+    uses: Soulike/ai-review-workflow/.github/workflows/ai-review.yml@main
     with:
       review-prompt-path: ""
       model: ${{ vars.AI_REVIEW_MODEL || 'auto' }}

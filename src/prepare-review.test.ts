@@ -10,7 +10,7 @@ import { prepareReview } from "./prepare-review.ts";
 const execute = promisify(execFile);
 
 test("prepares a separate consumer's base criteria and head objects without executing head code", async (t) => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "kestrel-evidence-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "review-evidence-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const source = path.join(root, "source");
   const consumer = path.join(root, "consumer");

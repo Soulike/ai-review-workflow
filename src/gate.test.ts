@@ -13,7 +13,7 @@ const identity = {
   baseSha,
   expectedHeadSha: headSha,
   prNumber: 42,
-  repository: "Soulike/knowledge-base",
+  repository: "owner/consumer",
   runAttempt: 2,
   runId: 1234,
   callId: 66,
@@ -24,7 +24,7 @@ function pullRequest(overrides: Record<string, unknown> = {}) {
   return {
     baseSha,
     headSha,
-    htmlUrl: "https://github.com/Soulike/knowledge-base/pull/42",
+    htmlUrl: "https://github.com/owner/consumer/pull/42",
     number: 42,
     state: "open",
     isDraft: false,
@@ -47,8 +47,8 @@ function review(
 
 None.
 
-<!-- kestrel-publication: call=66; check=77; sha=${"c".repeat(40)}; attempt=2 -->
-<!-- gh-aw-agentic-workflow: Kestrel review, engine: copilot, version: latest, model: grok-4.6, id: 1234, workflow_id: review, run: https://github.com/Soulike/knowledge-base/actions/runs/1234 -->`,
+<!-- ai-review-publication: call=66; check=77; sha=${"c".repeat(40)}; attempt=2 -->
+<!-- gh-aw-agentic-workflow: AI review, engine: copilot, version: latest, model: grok-4.6, id: 1234, workflow_id: review, run: https://github.com/owner/consumer/actions/runs/1234 -->`,
     commitSha: headSha,
     id: 99,
     state: "COMMENTED",
@@ -114,7 +114,7 @@ test("rejects sibling, forged, old-attempt and wrong-implementation publication 
     original.body.replace("attempt=2", "attempt=1"),
     original.body.replace("sha=" + "c".repeat(40), "sha=" + "d".repeat(40)),
     original.body +
-      "\n<!-- kestrel-publication: call=66; check=77; sha=" +
+      "\n<!-- ai-review-publication: call=66; check=77; sha=" +
       "c".repeat(40) +
       "; attempt=2 -->",
   ]) {

@@ -13,7 +13,7 @@ const entrypoint = fileURLToPath(
 );
 
 test("preflight is executable from a different working directory", async (t) => {
-  const root = await mkdtemp(path.join(tmpdir(), "kestrel-cli-"));
+  const root = await mkdtemp(path.join(tmpdir(), "review-cli-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await writeFile(
     path.join(root, "review.md"),
@@ -25,8 +25,8 @@ test("preflight is executable from a different working directory", async (t) => 
     {
       cwd: tmpdir(),
       env: {
-        KESTREL_REASONING_EFFORT: "high",
-        KESTREL_REVIEW_PROMPT_PATH: "review.md",
+        AI_REVIEW_REASONING_EFFORT: "high",
+        AI_REVIEW_PROMPT_PATH: "review.md",
       },
     },
   );

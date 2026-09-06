@@ -7,7 +7,7 @@ import test from "node:test";
 import { prepareReviewConfig } from "./configuration.ts";
 
 test("loads the trusted-base prompt rather than the head copy", async (t) => {
-  const root = await mkdtemp(path.join(tmpdir(), "kestrel-config-"));
+  const root = await mkdtemp(path.join(tmpdir(), "review-config-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const base = path.join(root, "base");
   const head = path.join(root, "head");
@@ -41,7 +41,7 @@ test("rejects missing or unsupported effort before attempting to read a prompt",
     await assert.rejects(
       prepareReviewConfig(
         { model: "auto", reasoningEffort, reviewPromptPath: "missing.md" },
-        "/nonexistent-kestrel-fixture",
+        "/nonexistent-review-fixture",
       ),
       /reasoning-effort.*required.*supported/u,
     );
@@ -56,14 +56,14 @@ test("accepts shared criteria only without requiring a prompt checkout", async (
         reasoningEffort: "xhigh",
         reviewPromptPath: "",
       },
-      "/nonexistent-kestrel-fixture",
+      "/nonexistent-review-fixture",
     ),
     { model: "custom-model", reasoningEffort: "xhigh", reviewPrompt: null },
   );
 });
 
 test("refuses prompt paths outside the trusted repository", async (t) => {
-  const root = await mkdtemp(path.join(tmpdir(), "kestrel-config-"));
+  const root = await mkdtemp(path.join(tmpdir(), "review-config-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const base = path.join(root, "base");
   const outside = path.join(root, "outside.md");
@@ -82,7 +82,7 @@ test("refuses prompt paths outside the trusted repository", async (t) => {
 });
 
 test("requires a readable Markdown file when a prompt path is supplied", async (t) => {
-  const root = await mkdtemp(path.join(tmpdir(), "kestrel-config-"));
+  const root = await mkdtemp(path.join(tmpdir(), "review-config-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await writeFile(path.join(root, "settings.json"), "{}");
   await mkdir(path.join(root, "directory.md"));
