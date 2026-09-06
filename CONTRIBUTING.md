@@ -128,9 +128,10 @@ tested.
 
 The custom `record_review_verdict` safe output carries only `approved` or
 `needs-change`. Its job validates one completed COMMENT review and one verdict,
-rejects incomplete/error signals, and uploads `review-result.json`. Built-in
-safe outputs publish the review and inline comments. The gate reads the result
-artifact and prerequisite job outcomes, never review prose, attribution
+rejects incomplete/error signals, and uploads `review-result.json`. Only after
+this job succeeds do built-in safe outputs publish the review and inline
+comments. The gate reads the result artifact and prerequisite job outcomes,
+never review prose, attribution
 markers, or current PR state. Finding severity and totals are review content;
 the Agent applies the high/medium rule, not a Markdown parser.
 

@@ -131,7 +131,6 @@ safe-outputs:
     record-review-verdict:
       description: Record the completed review verdict separately from review prose. Call exactly once.
       runs-on: ubuntu-latest
-      needs: safe_outputs
       permissions:
         contents: read
       inputs:
@@ -237,7 +236,8 @@ jobs:
     needs: [prepare]
 
   safe_outputs:
-    needs: [prepare]
+    needs: [prepare, record_review_verdict]
+    if: needs.agent.result == 'success' && needs.record_review_verdict.result == 'success'
 
   ai_review_gate:
     name: AI review gate
