@@ -101,13 +101,6 @@ pre-agent-steps:
       bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" "$ENGINE_VERSION"
       mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
       install -m 755 "$(command -v copilot)" "${RUNNER_TEMP}/gh-aw/bin/copilot"
-  - name: Set up pnpm
-    uses: pnpm/action-setup@v6
-    with:
-      package_json_file: workflow/package.json
-  - name: Install workflow dependencies
-    working-directory: workflow
-    run: pnpm install --frozen-lockfile --ignore-scripts
   - name: Prepare trusted review evidence
     env:
       GITHUB_TOKEN: ${{ github.token }}
@@ -117,8 +110,6 @@ pre-agent-steps:
       AI_REVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       AI_REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       AI_REVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
-      AI_REVIEW_PR_URL: ${{ github.server_url }}/${{ github.repository }}/pull/${{ github.event.pull_request.number }}
-      AI_REVIEW_REPOSITORY: ${{ github.repository }}
       AI_REVIEW_COPILOT_VERSION: ${{ needs.prepare.outputs.copilot-version }}
     run: node workflow/scripts/prepare-review.ts --repository-root consumer
   - name: Install latest review Skills
@@ -136,8 +127,40 @@ pre-agent-steps:
       bash workflow/scripts/verify-git-credentials-removed.sh "$GITHUB_WORKSPACE"
 
 safe-outputs:
+  jobs:
+    record-review-verdict:
+      description: Record the completed review verdict separately from review prose. Call exactly once.
+      runs-on: ubuntu-latest
+      needs: safe_outputs
+      permissions:
+        contents: read
+      inputs:
+        verdict:
+          description: Use needs-change if any high or medium finding exists; otherwise approved.
+          required: true
+          type: choice
+          options: [approved, needs-change]
+      steps:
+        - name: Check out result implementation
+          uses: actions/checkout@v7
+          with:
+            repository: ${{ job.workflow_repository }}
+            ref: ${{ job.workflow_sha }}
+            persist-credentials: false
+        - uses: actions/setup-node@v7
+          with:
+            node-version: "lts/*"
+        - name: Validate and write structured result
+          run: node scripts/write-review-result.ts "$GH_AW_AGENT_OUTPUT" /tmp/review-result.json
+        - name: Retain structured result
+          uses: actions/upload-artifact@v7
+          with:
+            name: ${{ needs.agent.outputs.artifact_prefix }}review-result
+            path: /tmp/review-result.json
+            retention-days: 30
+            overwrite: true
+            if-no-files-found: error
   github-token: ${{ secrets.GITHUB_TOKEN }}
-  needs: [publication_guard]
   report-failure-as-issue: false
   report-failed-jobs: false
   create-pull-request-review-comment:
@@ -170,7 +193,6 @@ jobs:
     outputs:
       copilot-version: ${{ steps.release.outputs.version }}
       reasoning-effort: ${{ steps.inputs.outputs.reasoning-effort }}
-      run-attempt: ${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -216,80 +238,14 @@ jobs:
 
   safe_outputs:
     needs: [prepare]
-    pre-steps:
-      - name: Bind publication to this job and invocation
-        uses: actions/github-script@v9
-        env:
-          AI_REVIEW_CALL_ID: ${{ needs.publication_guard.outputs.call-id }}
-          AI_REVIEW_CHECK_RUN_ID: ${{ job.check_run_id }}
-          AI_REVIEW_IMPLEMENTATION_SHA: ${{ job.workflow_sha }}
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { AI_REVIEW_CALL_ID: call, AI_REVIEW_CHECK_RUN_ID: check, AI_REVIEW_IMPLEMENTATION_SHA: sha, GITHUB_RUN_ATTEMPT: attempt } = process.env;
-            if (![call, check, attempt].every(value => /^[1-9][0-9]*$/.test(value || "")) || !/^[0-9a-f]{40}$/.test(sha || "")) {
-              throw new Error("Missing trusted publication identity.");
-            }
-            core.exportVariable("GH_AW_SAFE_OUTPUT_MESSAGES", JSON.stringify({
-              footer: `> Reviewed by [{workflow_name}]({run_url}).\n<!-- ai-review-publication: call=${call}; check=${check}; sha=${sha}; attempt=${attempt} -->`
-            }));
-
-  publication_guard:
-    name: Validate current review subject
-    needs: [agent, detection, prepare]
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: read
-    outputs:
-      call-id: ${{ steps.current.outputs.call-id }}
-    steps:
-      - name: Require a fresh full workflow attempt
-        env:
-          AI_REVIEW_PREPARE_ATTEMPT: ${{ needs.prepare.outputs.run-attempt }}
-        run: |
-          if [ "$AI_REVIEW_PREPARE_ATTEMPT" != "$GITHUB_RUN_ATTEMPT" ]; then
-            echo "::error::Earlier inference cannot be reused. Re-run all jobs."
-            exit 1
-          fi
-      - name: Check out workflow implementation
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "lts/*"
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Read this attempt's publication request
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.agent.outputs.artifact_prefix }}agent
-          path: /tmp/review-publication
-      - name: Verify current PR and bind this invocation
-        id: current
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          AI_REVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          AI_REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          AI_REVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
-          AI_REVIEW_PR_URL: ${{ github.server_url }}/${{ github.repository }}/pull/${{ github.event.pull_request.number }}
-          AI_REVIEW_REPOSITORY: ${{ github.repository }}
-          AI_REVIEW_CALL_ID: ${{ job.check_run_id }}
-        run: node scripts/assert-current.ts
 
   ai_review_gate:
     name: AI review gate
     if: always()
-    needs: [prepare, agent, safe_outputs, publication_guard]
+    needs: [prepare, agent, safe_outputs, record_review_verdict]
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
-      pull-requests: read
     steps:
       - name: Check out gate implementation
         uses: actions/checkout@v7
@@ -297,29 +253,22 @@ jobs:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: "lts/*"
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Authenticate published review and enforce verdict
+      - name: Download structured result
+        if: needs.record_review_verdict.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.agent.outputs.artifact_prefix }}review-result
+          path: /tmp/review-result
+      - name: Enforce structured verdict
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          AI_REVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          AI_REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          AI_REVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
-          AI_REVIEW_PR_URL: ${{ github.server_url }}/${{ github.repository }}/pull/${{ github.event.pull_request.number }}
-          AI_REVIEW_REPOSITORY: ${{ github.repository }}
-          AI_REVIEW_EVENT_ACTION: ${{ github.event.action }}
-          AI_REVIEW_PR_DRAFT: ${{ github.event.pull_request.draft }}
           AI_REVIEW_PREPARE_RESULT: ${{ needs.prepare.result }}
-          AI_REVIEW_PREPARE_ATTEMPT: ${{ needs.prepare.outputs.run-attempt }}
           AI_REVIEW_AGENT_RESULT: ${{ needs.agent.result }}
           AI_REVIEW_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
-          AI_REVIEW_GUARD_RESULT: ${{ needs.publication_guard.result }}
-          AI_REVIEW_CALL_ID: ${{ needs.publication_guard.outputs.call-id }}
-          AI_REVIEW_IMPLEMENTATION_SHA: ${{ job.workflow_sha }}
-        run: node scripts/review-gate.ts
+          AI_REVIEW_VERDICT_RESULT: ${{ needs.record_review_verdict.result }}
+        run: node scripts/review-gate.ts /tmp/review-result/review-result.json
 ---
 
 # Repository-aware pull-request review
@@ -370,17 +319,17 @@ Do not modify code, branches, labels, issues, or human review-thread state.
 Publish appropriate findings with `create_pull_request_review_comment`, pinned
 to the reviewed head, and exactly one consolidated `submit_pull_request_review`
 with event `COMMENT`. Use a finding only once: inline or body-only, never both.
-The consolidated body must contain these exact fields with concrete values:
+Include the model, a readable summary, severity totals, and reviewed head in the
+review body. Label each finding's severity and include unanchored or overflow
+findings in the consolidated body. This prose is for readers, not machine parsing.
 
-- **Model:** `the actual model used`
-- **Verdict:** `approved` or `needs-change`
-- **Findings:** high: 0, medium: 0, low: 0, nit: 0
-- **Reviewed head:** `${{ github.event.pull_request.head.sha }}`
+Call `record_review_verdict` exactly once with `verdict: needs-change` when any
+high or medium finding exists; otherwise use `verdict: approved`. This custom
+safe output is the only machine verdict. A complete review requires both the
+COMMENT review and this structured result. If the review is incomplete, call
+`report_incomplete` instead and do not record a verdict.
 
-Replace the counts with the exact totals of inline plus body-only findings.
-Each inline finding begins `**[severity] Short title**`. Include exactly one
-`## Findings not posted inline` section. Write `None.` when there are no body-only
-findings; otherwise start each body-only finding with a line of the form
-`- **[severity] Short title**`, followed by its evidence and recommended change.
-Use `needs-change` if and only if a high or medium finding exists. Do not invent
-or copy authentication markers; the trusted publisher appends them.
+Each workflow run is independent. Do not reconcile earlier publications or
+inspect current PR state to decide whether this run may publish. The event
+already fixes the review subject. Re-running failed jobs may reuse successful
+jobs and artifacts from this run.

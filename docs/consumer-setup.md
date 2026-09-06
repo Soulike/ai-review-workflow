@@ -77,11 +77,12 @@ jobs:
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
 ```
 
-The ceiling covers repository/PR evidence, run-attempt jobs, issue/discussion
+The ceiling covers repository/PR evidence, Actions evidence, issue/discussion
 context, code-scanning/Dependabot alerts, inference, and review publication. The
 shared workflow narrows permissions per job. The reviewer uses read-only GitHub
-tools; the isolated publisher receives PR-write access. The gate reads PR state,
-reviews, inline comments, and attempt jobs. No job receives issue-write access.
+tools; the isolated publisher receives PR-write access. The gate reads only
+run-local job outcomes and the structured result artifact, without querying PR
+state or published reviews. No job receives issue-write access.
 Optional evidence such as secret-scanning alerts may be inaccessible using this
 token. If unavailable evidence is necessary to complete the review, the review
 must remain incomplete; do not supply a broader token. See
@@ -129,11 +130,11 @@ implementation. Check the full run before requiring its gate:
 2. Checkouts use the consumer event base and invoked workflow implementation
    SHA, and the fetched head matches the event head.
 3. A `github-actions[bot]` comment review targets that head. It visibly records
-   model, verdict, severity totals, and reviewed head. Exercise an actionable
+   model, severity totals, and reviewed head. Exercise an actionable
    inline finding as well as a clean result.
-4. The gate authenticates framework attribution, invocation/publisher check IDs,
-   current run attempt, implementation SHA, current PR state, and exact inline
-   plus body-only counts. `approved` passes; `needs-change` fails explicitly.
+4. The custom safe-output job uploads `review-result.json` with a structured
+   `verdict`. With successful prerequisites, `approved` passes and
+   `needs-change` fails explicitly. The gate never parses review Markdown.
 5. Observe the actual qualified check name. With this caller, expect
    `Review / Engine / AI review gate`, but select the name GitHub actually emits
    in the branch's required-check settings. Bind the check to GitHub Actions
@@ -146,22 +147,29 @@ validated.
 
 ## Drafts, changes, and recovery
 
-Drafts do not run inference or publish a verdict. Their non-passing gate
-explains that they must be ready. Marking ready starts a new review. A new head
-or conversion to draft cancels superseded work. The current base/head, open
-state, and draft state are rechecked before publication and at the gate.
+Drafts do not run inference or publish a verdict; skipped prerequisites prevent
+the gate from passing. Marking ready starts a review. The caller cancels
+superseded work on a new head or conversion to draft.
 
-For execution, configuration, or publication failure, inspect the failing job,
-correct its cause, then choose **Re-run all jobs**. Do not rerun only failed
-jobs or an individual stage. If base/head moved, trigger a fresh supported PR
-event so the new event contains current revisions. Old or partial attempts
-cannot satisfy the new attempt's gate.
+Each workflow run reviews its event's fixed change independently. Publication
+does not recheck the PR's current open/draft/base/head state, and runs do not
+reconcile one another's comments.
 
-An interrupted attempt can leave visible comments. Publication and the gate are
-not atomic; the workflow does not destructively clean up old comments. Missing,
-ambiguous, malformed, or incomplete output and failed prerequisites have no
-review verdict. An authenticated `needs-change` is instead a completed content
-assessment: address or discuss the findings.
+For an execution or publication failure, correct its cause and choose
+**Re-run failed jobs**. Successful inference and publication jobs can be reused;
+the verdict artifact is retained for **30 days**. Other artifacts follow
+gh-aw and repository retention settings. Re-running only the gate reads the existing result and does not
+publish again. If a required framework artifact expired or was deleted, choose
+**Re-run all jobs**. gh-aw may also report an artifact-name conflict when a
+failed framework job is rerun after already uploading its artifact; use a full
+rerun in that case. The verdict upload itself permits replacement. To review a different head, trigger a new supported PR
+event rather than rerunning the old event.
+
+A rerun of publication may leave more than one visible review. This is accepted;
+there is no deduplication or cleanup. Missing, malformed, duplicate, or incomplete
+safe-output results and failed prerequisites cannot pass the gate. A valid
+`needs-change` is a completed content assessment: address or discuss the
+findings; rerunning the gate does not change that verdict.
 
 Consumers follow `main`, with no release or version-bump process. If an upstream
 workflow change breaks reviews, report its run URL and implementation SHA.

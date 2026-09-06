@@ -10,4 +10,4 @@ workflow, not the reviewer.
 The non-execution rule is an instruction within the existing isolation model,
 not a claimed mechanical execution barrier. Sandboxing limits where code can
 act; it does not make execution inside the sandbox inherently harmless or
-replace publication authorization and review-result authentication.
+replace the safe-output publication boundary and structured-result validation.

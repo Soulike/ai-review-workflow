@@ -1,46 +1,24 @@
-import {
-  positiveInteger,
-  readReviewConfig,
-  readReviewEvent,
-  sha,
-} from "../src/config.ts";
-import { GitHubClient } from "../src/github.ts";
-import { enforceReviewGate } from "../src/review-gate.ts";
+import { readFile } from "node:fs/promises";
+import { readReviewResult, requireApproved } from "../src/review-result.ts";
 
 try {
-  const config = readReviewConfig();
-  const event = readReviewEvent();
-  if (event.isDraft || event.action === "converted_to_draft") {
-    throw new Error(
-      "AI review cannot pass for a draft pull request. Mark it ready to request a review.",
-    );
-  }
-  for (const name of ["AI_REVIEW_PREPARE_RESULT", "AI_REVIEW_GUARD_RESULT"]) {
-    if (process.env[name] !== "success")
+  for (const name of [
+    "AI_REVIEW_PREPARE_RESULT",
+    "AI_REVIEW_AGENT_RESULT",
+    "AI_REVIEW_SAFE_OUTPUTS_RESULT",
+    "AI_REVIEW_VERDICT_RESULT",
+  ]) {
+    if (process.env[name] !== "success") {
       throw new Error(
-        `${name} did not succeed (${process.env[name] ?? "missing"}). Re-run all jobs after correcting the cause.`,
+        `${name} did not succeed (${process.env[name] ?? "missing"}).`,
       );
+    }
   }
-  if (process.env.AI_REVIEW_PREPARE_ATTEMPT !== String(config.runAttempt)) {
-    throw new Error("Earlier inference cannot be reused. Re-run all jobs.");
-  }
-  const client = new GitHubClient(
-    process.env.GITHUB_TOKEN ?? "",
-    config.repository,
-  );
-  const result = await enforceReviewGate(client, {
-    ...config,
-    ...event,
-    callId: positiveInteger(
-      process.env.AI_REVIEW_CALL_ID ?? "",
-      "AI_REVIEW_CALL_ID",
-    ),
-    implementationSha: sha(
-      process.env.AI_REVIEW_IMPLEMENTATION_SHA ?? "",
-      "AI_REVIEW_IMPLEMENTATION_SHA",
-    ),
-  });
-  console.log(`AI review ${result} for ${config.expectedHeadSha}.`);
+  const [file] = process.argv.slice(2);
+  if (!file) throw new Error("The review-result artifact path is required.");
+  const result = readReviewResult(JSON.parse(await readFile(file, "utf8")));
+  requireApproved(result);
+  console.log("AI review approved.");
 } catch (error) {
   console.error(
     error instanceof Error ? error.message : "AI review gate failed.",

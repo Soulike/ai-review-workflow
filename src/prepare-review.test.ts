@@ -47,10 +47,6 @@ test("prepares a separate consumer's base criteria and head objects without exec
     baseSha,
     expectedHeadSha,
     prNumber: 42,
-    prUrl: "https://github.com/other/consumer/pull/42",
-    repository: "other/consumer",
-    runId: 1,
-    runAttempt: 1,
   };
   const config = await prepareReview(consumer, inputs, identity, "fake-token");
   assert.equal(config.reviewPrompt?.content, "Trusted base criteria\n");
