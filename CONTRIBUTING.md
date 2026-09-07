@@ -52,7 +52,7 @@ This repository ships a reusable workflow, not a published JavaScript library.
   review.lock.yml     Compiled executable workflow; do not edit by hand
   review-pr.yml       This repository's caller of the public interface
   ci.yml              Candidate-code validation
-  review.test.ts      Workflow-fragment and caller-example tests
+  review.test.ts      Workflow installer/launcher tests
 scripts/              Commands launched by workflows or package.json
   lib/                Internal modules imported by those commands
 docs/                 Consumer setup, repository conventions, and decisions
@@ -166,9 +166,9 @@ consolidating a test.
 
 Do not duplicate workflow literals in Node assertions as a substitute for
 testing GitHub behavior. [`review.test.ts`](.github/workflows/review.test.ts) executes
-installer/launcher fragments and checks the documented caller; it does not
-emulate Actions. Local tests cannot establish live inference, authorization,
-checkout context, scheduling, or publication. Exact model prose is not a golden
+installer/launcher fragments; it does not emulate Actions. Local tests cannot
+establish live inference, authorization, checkout context, scheduling, or
+publication. Exact model prose is not a golden
 test oracle.
 
 ## Submit and verify a pull request
