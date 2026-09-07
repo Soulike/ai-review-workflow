@@ -38,11 +38,13 @@ env:
 
 permissions:
   actions: read
+  checks: read
   contents: read
   discussions: read
   issues: read
   pull-requests: read
   security-events: read
+  statuses: read
   vulnerability-alerts: read
   copilot-requests: write
 
@@ -269,6 +271,8 @@ jobs:
           AI_REVIEW_AGENT_RESULT: ${{ needs.agent.result }}
           AI_REVIEW_SAFE_OUTPUTS_RESULT: ${{ needs.safe_outputs.result }}
           AI_REVIEW_VERDICT_RESULT: ${{ needs.record_review_verdict.result }}
+          AI_REVIEW_PUBLICATION_STATUS: ${{ needs.safe_outputs.outputs.process_safe_outputs_status }}
+          AI_REVIEW_PUBLICATION_ITEMS_APPLIED: ${{ needs.safe_outputs.outputs.process_safe_outputs_items_applied }}
         run: node scripts/review-gate.ts /tmp/review-result/review-result.json
 ---
 

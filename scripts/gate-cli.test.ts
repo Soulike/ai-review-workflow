@@ -7,11 +7,16 @@ import test from "node:test";
 
 const writer = new URL("./write-review-result.ts", import.meta.url);
 const gate = new URL("./review-gate.ts", import.meta.url);
-const environment = {
+const prerequisites = {
   AI_REVIEW_PREPARE_RESULT: "success",
   AI_REVIEW_AGENT_RESULT: "success",
   AI_REVIEW_SAFE_OUTPUTS_RESULT: "success",
   AI_REVIEW_VERDICT_RESULT: "success",
+};
+const environment = {
+  ...prerequisites,
+  AI_REVIEW_PUBLICATION_STATUS: "success",
+  AI_REVIEW_PUBLICATION_ITEMS_APPLIED: "1",
 };
 
 test("writes a safe-output result and reuses the artifact in the gate without GitHub credentials", async (t) => {
@@ -82,7 +87,7 @@ test("gate fails on unsuccessful prerequisites or missing and malformed artifact
       encoding: "utf8",
       env,
     });
-  for (const name of Object.keys(environment)) {
+  for (const name of Object.keys(prerequisites)) {
     for (const state of ["failure", "cancelled", "skipped", ""]) {
       const result = run({ ...environment, [name]: state });
       assert.equal(result.status, 1);
@@ -93,5 +98,24 @@ test("gate fails on unsuccessful prerequisites or missing and malformed artifact
   for (const body of ["{", "{}", '{"verdict":"unknown"}']) {
     await writeFile(file, body);
     assert.equal(run().status, 1);
+  }
+});
+
+test("gate rejects missing or malformed publication evidence", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "review-publication-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const file = path.join(root, "result.json");
+  await writeFile(file, JSON.stringify({ verdict: "approved" }));
+  for (const [name, value] of [
+    ["AI_REVIEW_PUBLICATION_STATUS", ""],
+    ["AI_REVIEW_PUBLICATION_ITEMS_APPLIED", ""],
+    ["AI_REVIEW_PUBLICATION_ITEMS_APPLIED", "not-a-count"],
+  ] as const) {
+    const result = spawnSync(process.execPath, [gate.pathname, file], {
+      encoding: "utf8",
+      env: { ...environment, [name]: value },
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Required review was not published/u);
   }
 });

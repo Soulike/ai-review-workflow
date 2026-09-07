@@ -117,8 +117,10 @@ When changing workflow setup, preserve these implementation constraints:
 
 For verdict and publication changes, preserve the
 [stateless structured-result contract](docs/adr/0008-use-stateless-structured-review-results.md).
-The gate consumes the result artifact and prerequisite job outcomes, not review
-prose or current PR state.
+The gate consumes the result artifact, prerequisite job outcomes, and applied
+publication status. A successful publication job that skipped the required
+review cannot satisfy the gate. Review prose and current PR state are not gate
+inputs.
 
 ## Test and validate your change
 
@@ -138,10 +140,12 @@ ESLint owns code quality and TypeScript rules; Prettier owns formatting.
 `pnpm lint:fix` and `pnpm format` explicitly edit local files.
 
 Compilation validates the gh-aw schema and template expressions, but does not
-run actionlint. `workflows:lint` invokes it separately, with shellcheck disabled
-and narrow compatibility exclusions in
-[`lint-workflows.ts`](scripts/lint-workflows.ts). Recheck those exclusions when
-upgrading actionlint; remove obsolete ones without suppressing unrelated errors.
+run actionlint. `workflows:lint` checks that the caller, wrapper, and compiled
+reviewer retain `checks: read` and `statuses: read` for GitHub evidence tools,
+then invokes actionlint with shellcheck disabled and narrow compatibility
+exclusions in [`lint-workflows.ts`](scripts/lint-workflows.ts). Recheck those
+exclusions when upgrading actionlint; remove obsolete ones without suppressing
+unrelated errors. These static checks do not establish private-token API access.
 
 After committing source and generated changes, run the full CI check:
 
