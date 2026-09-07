@@ -52,25 +52,30 @@ This repository ships a reusable workflow, not a published JavaScript library.
   review.lock.yml     Compiled executable workflow; do not edit by hand
   review-pr.yml       This repository's caller of the public interface
   ci.yml              Candidate-code validation
-src/                  Importable implementation modules and Node tests
-scripts/              Executable command entrypoints and runner setup scripts
+  review.test.ts      Workflow-fragment and caller-example tests
+scripts/              Commands launched by workflows or package.json
+  lib/                Internal modules imported by those commands
 docs/                 Consumer setup, repository conventions, and decisions
 package.json          Shared local/CI command entrypoints
 ```
 
-Put validation, Git preparation, structured-result handling, and compiler
-invocation behavior in `src/`. These modules may perform I/O; their defining
-feature is that callers import them rather than launch them as commands.
-[`config.ts`](src/config.ts) decodes event revisions and the PR number;
-[`configuration.ts`](src/configuration.ts) validates consumer settings and reads
-the repository prompt.
+Keep executable entrypoints at the top of `scripts/` and the modules they import
+in `scripts/lib/`. Entrypoints connect a task to command-line arguments,
+environment variables, workflow outputs, diagnostics, and exit status. Internal
+modules own behavior such as input validation, Git preparation, and structured
+results. Both support the review runtime and development tooling; internal
+modules may also perform I/O.
 
-Put command-line arguments, environment mappings, workflow outputs, diagnostics,
-and exit status in `scripts/`. It also owns runner-specific shell operations.
-For example, [`write-review-result.ts`](scripts/write-review-result.ts) reads
-and writes files while [`review-result.ts`](src/review-result.ts) validates the
-safe-output data. Production modules in `src/` do not import executable
-entrypoints.
+For example, [`write-review-result.ts`](scripts/write-review-result.ts) and
+[`review-gate.ts`](scripts/review-gate.ts) are commands that both import
+[`lib/review-result.ts`](scripts/lib/review-result.ts). Change verdict rules in
+the module; change argument handling or failure reporting in the entrypoint.
+Internal modules do not import executable entrypoints. Standalone commands such
+as [`setup-ci-tools.sh`](scripts/setup-ci-tools.sh) need no matching module.
+
+Keep `*.test.ts` files beside the code they exercise: module tests in
+`scripts/lib/`, command tests at the top of `scripts/`, and workflow tests in
+`.github/workflows/`. There is no separate tests directory.
 
 Put triggers, permissions, job dependencies, and reviewer instructions in the
 workflow sources. The public interface calls the same-revision compiled engine
@@ -105,7 +110,7 @@ When changing workflow setup, preserve these implementation constraints:
   disables automatic CLI installation, so the pre-Agent step invokes gh-aw's
   installer and stages the selected binary on the read-only runtime mount.
   Keep compiler/runtime versions coordinated in
-  [`compiler-contract.ts`](src/compiler-contract.ts) and workflow setup.
+  [`compiler-contract.ts`](scripts/lib/compiler-contract.ts) and workflow setup.
 - `network.allowed` in `review.md` owns the defaults. Native
   `network.allowed-input` adds the `network_allowed` input; the public interface
   forwards it unchanged and gh-aw merges additions before starting the firewall.
@@ -152,15 +157,15 @@ commit them with the corresponding source before rerunning `pnpm check`.
 
 ### Choose useful tests
 
-Tests live under `src/`, usually beside the module they exercise, and are
-discovered by `pnpm test`. Use module tests for owned decisions and `*-cli.test.ts`
+`pnpm test` discovers colocated tests in `scripts/` (including `lib/`) and
+`.github/workflows/`. Use module tests for owned decisions and `*-cli.test.ts`
 tests for process contracts and cross-module wiring. Each test should detect a
 distinct realistic fault. Keep independent expected results and a valid control
 alongside rejection cases; identify what protection remains before removing or
 consolidating a test.
 
 Do not duplicate workflow literals in Node assertions as a substitute for
-testing GitHub behavior. [`workflow.test.ts`](src/workflow.test.ts) executes
+testing GitHub behavior. [`review.test.ts`](.github/workflows/review.test.ts) executes
 installer/launcher fragments and checks the documented caller; it does not
 emulate Actions. Local tests cannot establish live inference, authorization,
 checkout context, scheduling, or publication. Exact model prose is not a golden

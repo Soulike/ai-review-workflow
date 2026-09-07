@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { readReviewResult, requireApproved } from "../src/review-result.ts";
+import { readReviewResult, requireApproved } from "./lib/review-result.ts";
 
 try {
   for (const name of [

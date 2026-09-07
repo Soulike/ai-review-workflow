@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { resultFromSafeOutputs } from "../src/review-result.ts";
+import { resultFromSafeOutputs } from "./lib/review-result.ts";
 
 const [input, output] = process.argv.slice(2);
 if (!input || !output) throw new Error("Input and output paths are required.");

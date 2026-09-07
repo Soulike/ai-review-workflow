@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { parseArgs, promisify } from "node:util";
-import { readReviewConfig } from "../src/config.ts";
-import { prepareReview } from "../src/prepare-review.ts";
+import { readReviewTarget } from "./lib/review-target.ts";
+import { prepareReview } from "./lib/prepare-review.ts";
 
 const { values } = parseArgs({
   options: { "repository-root": { type: "string" } },
@@ -23,20 +23,21 @@ const { stdout } = await promisify(execFile)("copilot", [
 if (stdout.split("\n")[0] !== `GitHub Copilot CLI ${expectedVersion}.`) {
   throw new Error("Installed Copilot CLI does not match the selected version.");
 }
-const config = await prepareReview(
+const settings = await prepareReview(
   values["repository-root"],
   {
     model: process.env.AI_REVIEW_MODEL,
     reasoningEffort: process.env.AI_REVIEW_REASONING_EFFORT,
     reviewPromptPath: process.env.AI_REVIEW_PROMPT_PATH,
   },
-  readReviewConfig(),
+  readReviewTarget(),
   process.env.GITHUB_TOKEN ?? "",
 );
 await mkdir("/tmp/gh-aw", { recursive: true });
 await writeFile(
   "/tmp/gh-aw/repository-review-prompt.md",
-  config.reviewPrompt?.content ?? "No additional repository review criteria.\n",
+  settings.reviewPrompt?.content ??
+    "No additional repository review criteria.\n",
 );
 console.log(
   `Verified Copilot CLI ${expectedVersion} and exact review revisions.`,

@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import {
   assertNoGeneratedDrift,
   compileAgenticWorkflows,
-} from "../src/compiler-contract.ts";
+} from "./lib/compiler-contract.ts";
 
 const executeFile = promisify(execFile);
 

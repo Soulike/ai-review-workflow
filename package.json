@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test 'src/**/*.test.ts'",
+    "test": "node --test 'scripts/**/*.test.ts' '.github/workflows/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",

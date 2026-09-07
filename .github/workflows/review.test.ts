@@ -14,7 +14,7 @@ import test from "node:test";
 import { promisify } from "node:util";
 import { isSeq, parseDocument } from "yaml";
 
-const root = new URL("../", import.meta.url);
+const root = new URL("../../", import.meta.url);
 const compiledText = await readFile(
   new URL(".github/workflows/review.lock.yml", root),
   "utf8",

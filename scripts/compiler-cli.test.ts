@@ -13,7 +13,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { compileAgenticWorkflows } from "./compiler-contract.ts";
+import { compileAgenticWorkflows } from "./lib/compiler-contract.ts";
 
 const execute = promisify(execFile);
 
@@ -102,9 +102,7 @@ test("the drift-check entrypoint rejects generated changes made by compilation",
     '#!/bin/sh\nset -eu\nif [ "$1" = --version ]; then echo "gh aw version v0.88.2"; exit; fi\ncase "$TEST_DRIFT_ACTION" in\nwrite) printf "compiled\\n" >> "$TEST_DRIFT_PATH";;\ndelete) rm "$TEST_DRIFT_PATH";;\nesac\n',
   );
   await chmod(compiler, 0o755);
-  const entrypoint = fileURLToPath(
-    new URL("../scripts/check.ts", import.meta.url),
-  );
+  const entrypoint = fileURLToPath(new URL("./check.ts", import.meta.url));
   const run = (extra: NodeJS.ProcessEnv = {}) =>
     execute(process.execPath, [entrypoint], {
       cwd: root,

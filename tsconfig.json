@@ -16,5 +16,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+  "include": ["scripts/**/*.ts", ".github/workflows/*.test.ts"]
 }

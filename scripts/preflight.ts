@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 
-import { prepareReviewConfig } from "../src/configuration.ts";
+import { loadReviewSettings } from "./lib/review-settings.ts";
 
 try {
   const { values } = parseArgs({
@@ -8,7 +8,7 @@ try {
   });
   const repositoryRoot = values["repository-root"];
   if (!repositoryRoot) throw new Error("--repository-root is required.");
-  await prepareReviewConfig(
+  await loadReviewSettings(
     {
       model: process.env.AI_REVIEW_MODEL,
       reasoningEffort: process.env.AI_REVIEW_REASONING_EFFORT,
