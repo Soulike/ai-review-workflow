@@ -33,8 +33,12 @@ authorization still applies.
 
 Call `Soulike/ai-review-workflow/.github/workflows/ai-review.yml@main` from a
 job's `uses`, not from a step. You can add that job to an existing workflow or
-create a workflow under `.github/workflows/`. The filename, workflow name, and
-job name are your choices. See [GitHub's reusable-workflow syntax](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
+create a workflow under `.github/workflows/`. Choose a caller filename such as
+`review-pr.yml` or `ai-review.yml`. The filename `review.lock.yml` is temporarily
+unsupported: the pinned gh-aw runtime mistakes that caller for the shared engine
+and fails activation ([compatibility issue #12](https://github.com/Soulike/ai-review-workflow/issues/12)).
+The workflow name and job name are your choices. See
+[GitHub's reusable-workflow syntax](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
 for how the calling job fits into a workflow.
 
 The integration must satisfy these requirements:
