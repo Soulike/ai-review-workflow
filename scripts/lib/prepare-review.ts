@@ -1,20 +1,23 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { prepareReviewConfig, type ReviewInputs } from "./configuration.ts";
-import type { ReviewConfig } from "./config.ts";
+import {
+  loadReviewSettings,
+  type ReviewSettingsInput,
+} from "./review-settings.ts";
+import type { ReviewTarget } from "./review-target.ts";
 
 const executeFile = promisify(execFile);
 
 export async function prepareReview(
   repositoryRoot: string,
-  inputs: ReviewInputs,
-  identity: ReviewConfig,
+  inputs: ReviewSettingsInput,
+  target: ReviewTarget,
   token: string,
 ) {
-  const config = await prepareReviewConfig(inputs, repositoryRoot);
+  const settings = await loadReviewSettings(inputs, repositoryRoot);
   const git = async (...args: string[]) =>
     (await executeFile("git", ["-C", repositoryRoot, ...args])).stdout.trim();
-  if ((await git("rev-parse", "HEAD")) !== identity.baseSha) {
+  if ((await git("rev-parse", "HEAD")) !== target.baseSha) {
     throw new Error("Consumer checkout is not the exact event base.");
   }
   const header = Buffer.from(`x-access-token:${token}`).toString("base64");
@@ -26,7 +29,7 @@ export async function prepareReview(
       "fetch",
       "--no-tags",
       "origin",
-      `refs/pull/${identity.prNumber}/head`,
+      `refs/pull/${target.prNumber}/head`,
     ],
     {
       env: {
@@ -37,11 +40,11 @@ export async function prepareReview(
       },
     },
   );
-  if ((await git("rev-parse", "FETCH_HEAD")) !== identity.expectedHeadSha) {
+  if ((await git("rev-parse", "FETCH_HEAD")) !== target.expectedHeadSha) {
     throw new Error(
       "Pull-request head changed before review; request a fresh run.",
     );
   }
-  await git("cat-file", "-e", `${identity.expectedHeadSha}^{commit}`);
-  return config;
+  await git("cat-file", "-e", `${target.expectedHeadSha}^{commit}`);
+  return settings;
 }

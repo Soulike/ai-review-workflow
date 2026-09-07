@@ -1,7 +1,7 @@
 import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
-export type ReviewInputs = {
+export type ReviewSettingsInput = {
   model: string | undefined;
   reasoningEffort: string | undefined;
   reviewPromptPath: string | undefined;
@@ -67,8 +67,8 @@ async function readPrompt(repositoryRoot: string, reviewPromptPath: string) {
   }
 }
 
-export async function prepareReviewConfig(
-  inputs: ReviewInputs,
+export async function loadReviewSettings(
+  inputs: ReviewSettingsInput,
   repositoryRoot: string,
 ) {
   const reasoningEffort = requireReasoningEffort(inputs.reasoningEffort);

@@ -8,9 +8,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 const execute = promisify(execFile);
-const entrypoint = fileURLToPath(
-  new URL("../scripts/preflight.ts", import.meta.url),
-);
+const entrypoint = fileURLToPath(new URL("./preflight.ts", import.meta.url));
 
 test("preflight is executable from a different working directory", async (t) => {
   const root = await mkdtemp(path.join(tmpdir(), "review-cli-"));

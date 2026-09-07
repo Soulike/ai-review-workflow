@@ -1,12 +1,12 @@
-export type ReviewConfig = {
+export type ReviewTarget = {
   baseSha: string;
   expectedHeadSha: string;
   prNumber: number;
 };
 
-export function readReviewConfig(
+export function readReviewTarget(
   environment: NodeJS.ProcessEnv = process.env,
-): ReviewConfig {
+): ReviewTarget {
   const baseSha = environment.AI_REVIEW_BASE_SHA ?? "";
   const expectedHeadSha = environment.AI_REVIEW_HEAD_SHA ?? "";
   const number = environment.AI_REVIEW_PR_NUMBER ?? "";

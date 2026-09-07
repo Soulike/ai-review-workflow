@@ -1,3 +1,3 @@
-import { compileAgenticWorkflows } from "../src/compiler-contract.ts";
+import { compileAgenticWorkflows } from "./lib/compiler-contract.ts";
 
 await compileAgenticWorkflows();

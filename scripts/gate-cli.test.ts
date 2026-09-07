@@ -5,8 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const writer = new URL("../scripts/write-review-result.ts", import.meta.url);
-const gate = new URL("../scripts/review-gate.ts", import.meta.url);
+const writer = new URL("./write-review-result.ts", import.meta.url);
+const gate = new URL("./review-gate.ts", import.meta.url);
 const environment = {
   AI_REVIEW_PREPARE_RESULT: "success",
   AI_REVIEW_AGENT_RESULT: "success",

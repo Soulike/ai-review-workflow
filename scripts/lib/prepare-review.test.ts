@@ -43,13 +43,13 @@ test("prepares a separate consumer's base criteria and head objects without exec
     reasoningEffort: "high",
     reviewPromptPath: "review.md",
   };
-  const identity = {
+  const target = {
     baseSha,
     expectedHeadSha,
     prNumber: 42,
   };
-  const config = await prepareReview(consumer, inputs, identity, "fake-token");
-  assert.equal(config.reviewPrompt?.content, "Trusted base criteria\n");
+  const settings = await prepareReview(consumer, inputs, target, "fake-token");
+  assert.equal(settings.reviewPrompt?.content, "Trusted base criteria\n");
   assert.equal(await git(consumer, "rev-parse", "HEAD"), baseSha);
   assert.equal(
     await git(consumer, "show", `${expectedHeadSha}:review.md`),
@@ -63,7 +63,7 @@ test("prepares a separate consumer's base criteria and head objects without exec
     prepareReview(
       consumer,
       inputs,
-      { ...identity, expectedHeadSha: baseSha },
+      { ...target, expectedHeadSha: baseSha },
       "fake-token",
     ),
     /head changed/u,
@@ -72,7 +72,7 @@ test("prepares a separate consumer's base criteria and head objects without exec
     prepareReview(
       consumer,
       inputs,
-      { ...identity, baseSha: expectedHeadSha },
+      { ...target, baseSha: expectedHeadSha },
       "fake-token",
     ),
     /exact event base/u,

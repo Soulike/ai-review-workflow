@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { prepareReviewConfig } from "./configuration.ts";
+import { loadReviewSettings } from "./review-settings.ts";
 
 test("reads the configured Markdown prompt and defaults the model", async (t) => {
   const root = await mkdtemp(path.join(tmpdir(), "review-config-"));
@@ -14,7 +14,7 @@ test("reads the configured Markdown prompt and defaults the model", async (t) =>
   await writeFile(path.join(base, "docs/review.md"), "Check error handling.\n");
 
   assert.deepEqual(
-    await prepareReviewConfig(
+    await loadReviewSettings(
       {
         model: undefined,
         reasoningEffort: "high",
@@ -36,7 +36,7 @@ test("reads the configured Markdown prompt and defaults the model", async (t) =>
 test("rejects missing or unsupported effort before attempting to read a prompt", async () => {
   for (const reasoningEffort of [undefined, "", "   ", "banana"]) {
     await assert.rejects(
-      prepareReviewConfig(
+      loadReviewSettings(
         { model: "auto", reasoningEffort, reviewPromptPath: "missing.md" },
         "/nonexistent-review-fixture",
       ),
@@ -47,7 +47,7 @@ test("rejects missing or unsupported effort before attempting to read a prompt",
 
 test("accepts shared criteria only without requiring a prompt checkout", async () => {
   assert.deepEqual(
-    await prepareReviewConfig(
+    await loadReviewSettings(
       {
         model: " custom-model ",
         reasoningEffort: "xhigh",
@@ -69,7 +69,7 @@ test("refuses prompt paths outside the trusted repository", async (t) => {
   await symlink(outside, path.join(base, "linked.md"));
   for (const reviewPromptPath of ["../outside.md", outside, "linked.md"]) {
     await assert.rejects(
-      prepareReviewConfig(
+      loadReviewSettings(
         { model: undefined, reasoningEffort: "high", reviewPromptPath },
         base,
       ),
@@ -89,7 +89,7 @@ test("requires a readable Markdown file when a prompt path is supplied", async (
     "directory.md",
   ]) {
     await assert.rejects(
-      prepareReviewConfig(
+      loadReviewSettings(
         { model: undefined, reasoningEffort: "high", reviewPromptPath },
         root,
       ),

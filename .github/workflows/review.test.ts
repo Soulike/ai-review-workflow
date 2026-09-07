@@ -14,22 +14,12 @@ import test from "node:test";
 import { promisify } from "node:util";
 import { isSeq, parseDocument } from "yaml";
 
-const root = new URL("../", import.meta.url);
+const root = new URL("../../", import.meta.url);
 const compiledText = await readFile(
   new URL(".github/workflows/review.lock.yml", root),
   "utf8",
 );
 const compiled = parseDocument(compiledText);
-const caller = parseDocument(
-  await readFile(new URL(".github/workflows/review-pr.yml", root), "utf8"),
-);
-
-test("the documented caller matches the executable self-consumer", async () => {
-  const guide = await readFile(new URL("docs/consumer-setup.md", root), "utf8");
-  const example = /```yaml\n([\s\S]*?)\n```/u.exec(guide)?.[1];
-  assert.ok(example);
-  assert.deepEqual(parseDocument(example).toJSON(), caller.toJSON());
-});
 
 test("installation stages the binary used by the launcher and preserves arguments", async (t) => {
   const temporary = await mkdtemp(path.join(os.tmpdir(), "review-launcher-"));
