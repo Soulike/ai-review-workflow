@@ -84,11 +84,13 @@ jobs:
       cancel-in-progress: true
     permissions:
       actions: read
+      checks: read
       contents: read
       discussions: read
       issues: read
       pull-requests: write
       security-events: read
+      statuses: read
       vulnerability-alerts: read
       copilot-requests: write
     uses: Soulike/ai-review-workflow/.github/workflows/ai-review.yml@main

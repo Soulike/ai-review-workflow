@@ -38,11 +38,13 @@ env:
 
 permissions:
   actions: read
+  checks: read
   contents: read
   discussions: read
   issues: read
   pull-requests: read
   security-events: read
+  statuses: read
   vulnerability-alerts: read
   copilot-requests: write
 
