@@ -117,8 +117,10 @@ When changing workflow setup, preserve these implementation constraints:
 
 For verdict and publication changes, preserve the
 [stateless structured-result contract](docs/adr/0008-use-stateless-structured-review-results.md).
-The gate consumes the result artifact and prerequisite job outcomes, not review
-prose or current PR state.
+The gate consumes the result artifact, prerequisite job outcomes, and applied
+publication status. A successful publication job that skipped the required
+review cannot satisfy the gate. Review prose and current PR state are not gate
+inputs.
 
 ## Test and validate your change
 

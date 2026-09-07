@@ -14,6 +14,19 @@ try {
       );
     }
   }
+  const publicationStatus = process.env.AI_REVIEW_PUBLICATION_STATUS;
+  const appliedItems = Number(process.env.AI_REVIEW_PUBLICATION_ITEMS_APPLIED);
+  // The validated stream requires a review. No skipped outputs and at least
+  // one applied item establish its publication; job success alone does not.
+  if (
+    publicationStatus !== "success" ||
+    !Number.isSafeInteger(appliedItems) ||
+    appliedItems < 1
+  ) {
+    throw new Error(
+      `Required review was not published successfully (status: ${publicationStatus ?? "missing"}, applied items: ${process.env.AI_REVIEW_PUBLICATION_ITEMS_APPLIED ?? "missing"}).`,
+    );
+  }
   const [file] = process.argv.slice(2);
   if (!file) throw new Error("The review-result artifact path is required.");
   const result = readReviewResult(JSON.parse(await readFile(file, "utf8")));

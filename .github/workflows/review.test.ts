@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import {
   chmod,
   mkdtemp,
@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
-import { isSeq, parseDocument } from "yaml";
+import { Document, isMap, isScalar, isSeq, parseDocument } from "yaml";
 
 const root = new URL("../../", import.meta.url);
 const compiledText = await readFile(
@@ -20,6 +20,81 @@ const compiledText = await readFile(
   "utf8",
 );
 const compiled = parseDocument(compiledText);
+
+test("gate rejects skipped publication through the compiled output and environment wiring", async (t) => {
+  const temporary = await mkdtemp(
+    path.join(os.tmpdir(), "review-publication-"),
+  );
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  const artifact = path.join(temporary, "review-result.json");
+  await writeFile(artifact, JSON.stringify({ verdict: "approved" }));
+  const gateSteps = compiled.getIn(["jobs", "ai_review_gate", "steps"]);
+  assert.ok(isSeq(gateSteps));
+  const gateIndex = gateSteps.items.findIndex(
+    (_, i) =>
+      compiled.getIn(["jobs", "ai_review_gate", "steps", i, "name"]) ===
+      "Enforce structured verdict",
+  );
+  assert.ok(gateIndex >= 0);
+
+  function resolveMapping(mapping: unknown, context: Document) {
+    assert.ok(isMap(mapping));
+    return Object.fromEntries(
+      mapping.items.map(({ key, value }) => {
+        assert.ok(isScalar(key) && typeof key.value === "string");
+        assert.ok(isScalar(value) && typeof value.value === "string");
+        const reference = /^\$\{\{\s*([\w.]+)\s*\}\}$/u.exec(value.value)?.[1];
+        assert.ok(reference, `Unsupported fixture expression: ${value.value}`);
+        const resolved = context.getIn(reference.split(".")) ?? "";
+        assert.ok(typeof resolved === "string");
+        return [key.value, resolved];
+      }),
+    );
+  }
+
+  for (const [status, applied, exitCode] of [
+    ["success", "1", 0],
+    ["completed_with_skips", "0", 1],
+    ["completed_with_skips", "1", 1],
+    ["success", "0", 1],
+  ] as const) {
+    const outputs = resolveMapping(
+      compiled.getIn(["jobs", "safe_outputs", "outputs"]),
+      new Document({
+        steps: {
+          process_safe_outputs: { outputs: { status, items_applied: applied } },
+        },
+      }),
+    );
+    const env = resolveMapping(
+      compiled.getIn(["jobs", "ai_review_gate", "steps", gateIndex, "env"]),
+      new Document({
+        needs: {
+          prepare: { result: "success" },
+          agent: { result: "success" },
+          record_review_verdict: { result: "success" },
+          safe_outputs: { result: "success", outputs },
+        },
+      }),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [new URL("scripts/review-gate.ts", root).pathname, artifact],
+      { encoding: "utf8", env },
+    );
+    assert.equal(
+      result.status,
+      exitCode,
+      `${status}, applied=${applied}: ${result.stdout}${result.stderr}`,
+    );
+    assert.match(
+      result.stdout + result.stderr,
+      exitCode === 0
+        ? /AI review approved/u
+        : /Required review was not published/u,
+    );
+  }
+});
 
 test("installation stages the binary used by the launcher and preserves arguments", async (t) => {
   const temporary = await mkdtemp(path.join(os.tmpdir(), "review-launcher-"));
