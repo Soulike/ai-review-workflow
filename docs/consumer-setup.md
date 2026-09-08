@@ -138,6 +138,11 @@ commit, not the proposed head. Land a new prompt before enabling its path; a
 prompt first added in a PR cannot judge that same PR. Shared review Skills and
 reference material follow their latest upstream versions.
 
+The shared [review instructions](../.github/workflows/review.md#review-body) lead
+with the AI review's conclusion, followed by a brief explanation and visible
+model, commit, and severity details. Summaries use the main language of the PR
+description, with English as the fallback; wording varies with the change.
+
 ### Extra network access
 
 The default sandbox allowlist includes Tavily (`mcp.tavily.com`) and gh-aw's
