@@ -41,11 +41,11 @@ test("standalone and gh-extension launchers check versions, pass arguments, and 
     };
     await assert.rejects(
       compileAgenticWorkflows(env),
-      /Expected gh-aw compiler v0\.88\.2/u,
+      /Expected gh-aw compiler v0\.88\.7/u,
     );
     await assert.rejects(readFile(marker), { code: "ENOENT" });
     await assert.rejects(
-      compileAgenticWorkflows({ ...env, TEST_VERSION: "v0.88.2" }),
+      compileAgenticWorkflows({ ...env, TEST_VERSION: "v0.88.7" }),
       /exit code 23/u,
     );
     assert.deepEqual((await readFile(marker, "utf8")).trim().split("\n"), [
@@ -53,7 +53,7 @@ test("standalone and gh-extension launchers check versions, pass arguments, and 
       "--action-mode",
       "release",
       "--action-tag",
-      "v0.88.2",
+      "v0.88.7",
       "--strict",
       "--validate",
       "--no-check-update",
@@ -99,7 +99,7 @@ test("the drift-check entrypoint rejects generated changes made by compilation",
   const compiler = path.join(root, "compiler");
   await writeFile(
     compiler,
-    '#!/bin/sh\nset -eu\nif [ "$1" = --version ]; then echo "gh aw version v0.88.2"; exit; fi\ncase "$TEST_DRIFT_ACTION" in\nwrite) printf "compiled\\n" >> "$TEST_DRIFT_PATH";;\ndelete) rm "$TEST_DRIFT_PATH";;\nesac\n',
+    '#!/bin/sh\nset -eu\nif [ "$1" = --version ]; then echo "gh aw version v0.88.7"; exit; fi\ncase "$TEST_DRIFT_ACTION" in\nwrite) printf "compiled\\n" >> "$TEST_DRIFT_PATH";;\ndelete) rm "$TEST_DRIFT_PATH";;\nesac\n',
   );
   await chmod(compiler, 0o755);
   const entrypoint = fileURLToPath(new URL("./check.ts", import.meta.url));

@@ -26,11 +26,11 @@ language features, not a fixed CI selection.
 pnpm install --frozen-lockfile --ignore-scripts
 ```
 
-Workflow validation also needs Git, GitHub CLI, gh-aw **v0.88.2**, and
+Workflow validation also needs Git, GitHub CLI, gh-aw **v0.88.7**, and
 **actionlint v1.7.12**. If the gh-aw extension is not already installed:
 
 ```sh
-gh extension install github/gh-aw --pin v0.88.2
+gh extension install github/gh-aw --pin v0.88.7
 ```
 
 If another gh-aw version is installed, select an isolated official release
@@ -105,11 +105,15 @@ When changing workflow setup, preserve these implementation constraints:
   Do not install consumer dependencies or ask the reviewer to run candidate
   code. Candidate tests belong to separate CI; broad sandbox tools remain, so
   the non-execution rule is an instruction, not a technical barrier.
-- The custom Copilot launcher passes validated reasoning effort because this
-  compiler cannot compile a dynamic `engine.args` expression. A custom command
-  disables automatic CLI installation, so the pre-Agent step invokes gh-aw's
-  installer and stages the selected binary on the read-only runtime mount.
-  Keep compiler/runtime versions coordinated in
+- The custom Copilot launcher passes validated reasoning effort because placing
+  a dynamic `engine.args` expression in the generated execution command exceeds
+  GitHub's expression size limit. A custom command disables automatic CLI
+  installation, so the pre-Agent step invokes gh-aw's compatibility-aware
+  installer without a version override and stages the selected binary on the
+  read-only runtime mount. The install step log identifies the concrete CLI
+  selected at runtime; with no `engine.version`, gh-aw v0.88.7's generated
+  metadata shows its baked fallback instead of the compatibility-resolved
+  version. Keep compiler/runtime versions coordinated in
   [`compiler-contract.ts`](scripts/lib/compiler-contract.ts) and workflow setup.
 - `network.allowed` in `review.md` owns the defaults. Native
   `network.allowed-input` adds the `network_allowed` input; the public interface

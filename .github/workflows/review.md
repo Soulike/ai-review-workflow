@@ -28,7 +28,6 @@ inlined-imports: true
 
 engine:
   id: copilot
-  version: ${{ needs.prepare.outputs.copilot-version }}
   model: ${{ inputs.model || 'auto' }}
   command: >-
     exec "${RUNNER_TEMP}/gh-aw/bin/copilot" --reasoning-effort "${AI_REVIEW_REASONING_EFFORT:?reasoning effort is required}"
@@ -95,13 +94,11 @@ pre-agent-steps:
       ref: ${{ job.workflow_sha }}
       path: workflow
       persist-credentials: false
-  - name: Install selected Copilot CLI for the custom launcher
+  - name: Install compatible Copilot CLI for the custom launcher
     env:
-      ENGINE_VERSION: ${{ needs.prepare.outputs.copilot-version }}
-      GH_AW_COMPILED_VERSION: v0.88.2
-      GH_HOST: github.com
+      GH_AW_COMPILED_VERSION: v0.88.7
     run: |
-      bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" "$ENGINE_VERSION"
+      bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh"
       mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
       install -m 755 "$(command -v copilot)" "${RUNNER_TEMP}/gh-aw/bin/copilot"
   - name: Prepare trusted review evidence
@@ -113,7 +110,6 @@ pre-agent-steps:
       AI_REVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
       AI_REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       AI_REVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
-      AI_REVIEW_COPILOT_VERSION: ${{ needs.prepare.outputs.copilot-version }}
     run: node workflow/scripts/prepare-review.ts --repository-root consumer
   - name: Install latest review Skills
     run: npx --yes skills@latest add mattpocock/skills --agent github-copilot --skill codebase-design tdd writing-for-agents --copy --yes --full-depth
@@ -193,7 +189,6 @@ jobs:
     permissions:
       contents: read
     outputs:
-      copilot-version: ${{ steps.release.outputs.version }}
       reasoning-effort: ${{ steps.inputs.outputs.reasoning-effort }}
     steps:
       - uses: actions/checkout@v7
@@ -218,18 +213,6 @@ jobs:
           test "$AI_REVIEW_EVENT_NAME" = pull_request_target
           test -n "$AI_REVIEW_REASONING_EFFORT"
           test -n "$TAVILY_API_KEY"
-      - name: Resolve latest stable Copilot CLI
-        id: release
-        uses: actions/github-script@v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { data } = await github.rest.repos.getLatestRelease({ owner: "github", repo: "copilot-cli" });
-            if (data.draft || data.prerelease || !/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(data.tag_name)) {
-              throw new Error("Cannot resolve a concrete stable Copilot CLI version.");
-            }
-            core.setOutput("version", data.tag_name.slice(1));
-
   activation:
     needs: [prepare]
   agent:
