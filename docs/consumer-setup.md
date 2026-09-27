@@ -18,8 +18,9 @@ credentials are outside this interface.
   including the policy for organization-billed CLI use. A personal subscription
   alone does not establish access for this workflow's token.
 - Store a Tavily API key in an Actions secret available to your repository.
-  Tavily provides external-source search and extraction. The secret's name in
-  your repository is your choice; pass it to the workflow as `TAVILY_API_KEY`.
+  Tavily retrieves content from external pages found through Copilot's
+  native web search. The secret's name in your repository is your choice; pass
+  it to the workflow as `TAVILY_API_KEY`.
 
 The public interface accepts only the Tavily secret. GitHub supplies the
 built-in token; do not pass a PAT, `COPILOT_GITHUB_TOKEN`, or `GH_AW_*` token

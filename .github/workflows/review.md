@@ -28,6 +28,11 @@ inlined-imports: true
 
 engine:
   id: copilot
+  # Native web search needs CLI 1.0.87+. gh-aw v0.89.21 may reuse an older
+  # cached CLI from its 1.0.21..1.0.87 compatibility window. Remove this and
+  # the matching pre-agent installer pin only when both unpinned install paths
+  # reject cached CLIs below 1.0.87 (for example, compat min-agent >=1.0.87).
+  version: "1.0.87"
   model: ${{ inputs.model || 'auto' }}
   command: >-
     exec "${RUNNER_TEMP}/gh-aw/bin/copilot" --reasoning-effort "${AI_REVIEW_REASONING_EFFORT:?reasoning effort is required}"
@@ -49,6 +54,7 @@ permissions:
 
 tools:
   bash: [":*"]
+  web-search:
   github:
     mode: local
     read-only: true
@@ -61,7 +67,7 @@ mcp-servers:
     url: https://mcp.tavily.com/mcp/
     headers:
       Authorization: Bearer ${{ secrets.TAVILY_API_KEY }}
-    allowed: [tavily_search, tavily_extract]
+    allowed: [tavily_extract]
 
 network:
   allowed: [github, mcp.tavily.com]
@@ -94,11 +100,9 @@ pre-agent-steps:
       ref: ${{ job.workflow_sha }}
       path: workflow
       persist-credentials: false
-  - name: Install compatible Copilot CLI for the custom launcher
-    env:
-      GH_AW_COMPILED_VERSION: v0.88.7
+  - name: Install Copilot CLI for the custom launcher
     run: |
-      bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh"
+      bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh" 1.0.87
       mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
       install -m 755 "$(command -v copilot)" "${RUNNER_TEMP}/gh-aw/bin/copilot"
   - name: Prepare trusted review evidence
@@ -283,8 +287,9 @@ publication, or verdict contract. Keep the trusted checkout unchanged.
 Use read-only GitHub tools for PR state, files, checks, linked issues, reviews,
 and review threads. Fetch every required page and all comments of each thread.
 If the evidence needed for a complete review cannot be obtained, call
-`report_incomplete` and do not submit a review. Use Tavily search/extract when
-current external primary sources are needed. Do not issue GitHub API commands
+`report_incomplete` and do not submit a review. When current external primary
+sources are needed, use native web search to find them and Tavily extract to
+read the relevant pages. Do not issue GitHub API commands
 through Bash or attempt to restore credentials.
 
 ## Review criteria
