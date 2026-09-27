@@ -26,11 +26,11 @@ language features, not a fixed CI selection.
 pnpm install --frozen-lockfile --ignore-scripts
 ```
 
-Workflow validation also needs Git, GitHub CLI, gh-aw **v0.88.7**, and
+Workflow validation also needs Git, GitHub CLI, gh-aw **v0.89.21**, and
 **actionlint v1.7.12**. If the gh-aw extension is not already installed:
 
 ```sh
-gh extension install github/gh-aw --pin v0.88.7
+gh extension install github/gh-aw --pin v0.89.21
 ```
 
 If another gh-aw version is installed, select an isolated official release
@@ -79,8 +79,8 @@ Keep `*.test.ts` files beside the code they exercise: module tests in
 
 Put triggers, permissions, job dependencies, and reviewer instructions in the
 workflow sources. The public interface calls the same-revision compiled engine
-and forwards only the Tavily secret, keeping compiler-added `aw_context` and
-optional token overrides out of the consumer interface. Update the
+and forwards only the Tavily extraction secret, keeping compiler-added
+`aw_context` and optional token overrides out of the consumer interface. Update the
 [consumer guide](docs/consumer-setup.md) when changing that interface or its
 observable behavior.
 
@@ -108,12 +108,11 @@ When changing workflow setup, preserve these implementation constraints:
 - The custom Copilot launcher passes validated reasoning effort because placing
   a dynamic `engine.args` expression in the generated execution command exceeds
   GitHub's expression size limit. A custom command disables automatic CLI
-  installation, so the pre-Agent step invokes gh-aw's compatibility-aware
-  installer without a version override and stages the selected binary on the
-  read-only runtime mount. The install step log identifies the concrete CLI
-  selected at runtime; with no `engine.version`, gh-aw v0.88.7's generated
-  metadata shows its baked fallback instead of the compatibility-resolved
-  version. Keep compiler/runtime versions coordinated in
+  installation, so the pre-Agent step installs Copilot CLI 1.0.87 and stages it
+  on the read-only runtime mount. The same `engine.version` pins generated CLI
+  installation. Native web search requires at least 1.0.87; the gh-aw
+  compatibility window also accepts older cached versions, so an unpinned
+  install could omit the search tool. Keep compiler/runtime versions coordinated in
   [`compiler-contract.ts`](scripts/lib/compiler-contract.ts) and workflow setup.
 - `network.allowed` in `review.md` owns the defaults. Native
   `network.allowed-input` adds the `network_allowed` input; the public interface
