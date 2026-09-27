@@ -28,6 +28,10 @@ inlined-imports: true
 
 engine:
   id: copilot
+  # Native web search needs CLI 1.0.87+. gh-aw v0.89.21 may reuse an older
+  # cached CLI from its 1.0.21..1.0.87 compatibility window. Remove this and
+  # the matching pre-agent installer pin only when both unpinned install paths
+  # reject cached CLIs below 1.0.87 (for example, compat min-agent >=1.0.87).
   version: "1.0.87"
   model: ${{ inputs.model || 'auto' }}
   command: >-

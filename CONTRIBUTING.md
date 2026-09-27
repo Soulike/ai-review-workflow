@@ -112,7 +112,10 @@ When changing workflow setup, preserve these implementation constraints:
   on the read-only runtime mount. The same `engine.version` pins generated CLI
   installation. Native web search requires at least 1.0.87; the gh-aw
   compatibility window also accepts older cached versions, so an unpinned
-  install could omit the search tool. Keep compiler/runtime versions coordinated in
+  install could omit the search tool. Remove both CLI pins only when the custom
+  pre-Agent install and gh-aw's generated install reject cached CLIs below
+  1.0.87; a compatibility window whose minimum reaches 1.0.87 would satisfy
+  both paths. Keep compiler/runtime versions coordinated in
   [`compiler-contract.ts`](scripts/lib/compiler-contract.ts) and workflow setup.
 - `network.allowed` in `review.md` owns the defaults. Native
   `network.allowed-input` adds the `network_allowed` input; the public interface
