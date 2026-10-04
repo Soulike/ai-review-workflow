@@ -12,6 +12,9 @@ credentials are outside this interface.
   repository and organization policies must allow the actions and reusable
   workflows used by `Soulike/ai-review-workflow`, including the token permissions
   listed under [calling the workflow](#call-the-reusable-workflow).
+- For a public consumer repository, ensure an active Actions event policy allows
+  `pull_request_target` for your caller workflow. See
+  [allowing the event](#allow-the-pull_request_target-event).
 - Establish Copilot CLI access through the built-in `GITHUB_TOKEN` and
   `copilot-requests: write`. This permission alone does not grant entitlement or
   billing access. Follow [GitHub's prerequisites](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli-in-actions),
@@ -29,6 +32,39 @@ override. Use explicit secret mapping, not `secrets: inherit`.
 Your repository's PR-admission settings remain yours. The workflow repository's
 collaborator-only policy is not a consumer prerequisite; gh-aw's own actor
 authorization still applies.
+
+### Allow the `pull_request_target` event
+
+GitHub's [default event policy](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target#default-policy-for-pull_request_target)
+blocks `pull_request_target` in public repositories without an applicable Actions
+event policy. GitHub's announced enforcement date is **November 2, 2026**.
+Before enforcement, an evaluate-mode warning lets the run continue but identifies
+a caller that needs a policy. Private and internal repositories are exempt from
+this default restriction.
+
+Each public consumer repository must be covered by an active event policy
+allowing `pull_request_target` for its caller workflow. An existing organization
+or enterprise policy can cover multiple consumers; configuring the shared
+workflow repository does not cover repositories that call it. All applicable
+policies still apply, so an administrator must update any policy that blocks the
+event.
+
+To configure a repository policy:
+
+1. Open **Settings → Actions → Policies** and create or update a policy.
+2. Target your caller workflow's path, such as
+   `.github/workflows/review-pr.yml`. Use the filename you choose under
+   [calling the workflow](#call-the-reusable-workflow).
+3. Set enforcement to **Active** and add an event rule allowing
+   `pull_request_target`. If the policy also covers other workflows or events,
+   retain the events those workflows need.
+4. Save the policy, then verify a fresh PR run using the
+   [verification checklist](#verify-and-require-the-gate).
+
+See [GitHub's policy configuration guide](https://docs.github.com/en/actions/how-tos/administer/control-workflow-execution)
+for organization and enterprise targeting or additional actor restrictions.
+This integration requires `pull_request_target`; switching the caller to
+`pull_request` fails setup.
 
 ## Call the reusable workflow
 
@@ -168,6 +204,9 @@ deployed `pull_request_target` workflow. Before making the gate required:
 1. Open the run in Actions and confirm setup, inference, and publication succeed
    in your repository. This checks your actual credentials, model access, and
    organization policies; this repository's self-review does not verify yours.
+   For a public repository, also check **Settings → Actions → Policy insights**
+   and the new run's annotations to confirm the caller's event policy allows
+   execution and the default-policy warning is gone.
 2. Confirm a `github-actions[bot]` comment review identifies the reviewed head
    and model. With successful execution and publication, an `approved` verdict
    passes the gate; `needs-change` fails it. High or medium findings require
@@ -195,6 +234,10 @@ trigger a new supported PR event rather than rerunning the old event.
 
 - **A completed review needs changes:** address or discuss the findings.
   Re-running only the gate cannot change a `needs-change` verdict.
+- **An execution-policy warning or block:** check the policies applying to your
+  caller workflow and follow [the event-policy setup](#allow-the-pull_request_target-event).
+  If an organization or enterprise policy blocks the event, ask its administrator
+  to update it, then trigger a fresh supported PR event.
 - **Setup, inference, or publication failed:** inspect the failed job's log,
   correct the cause, and choose **Re-run failed jobs**. Successful stages can be
   reused. If required evidence is inaccessible, the review cannot complete;
