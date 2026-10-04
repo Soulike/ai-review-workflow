@@ -7,7 +7,7 @@ publication, and a structured-result review gate. Consumers supply configuration
 and optional review criteria, without installing or maintaining the
 implementation.
 
-- [Set up a consumer repository](docs/consumer-setup.md)
+- [Set up a consumer repository, including its Actions policy](docs/consumer-setup.md)
 - [Contribute to the workflow](CONTRIBUTING.md)
 - [Domain language](GLOSSARY.md) and [architectural decisions](docs/adr/)
 
