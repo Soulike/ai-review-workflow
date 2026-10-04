@@ -9,7 +9,7 @@ implementation.
 
 - [Set up a consumer repository](docs/consumer-setup.md)
 - [Contribute to the workflow](CONTRIBUTING.md)
-- [Domain language](CONTEXT.md) and [architectural decisions](docs/adr/)
+- [Domain language](GLOSSARY.md) and [architectural decisions](docs/adr/)
 
 Consumers follow `main`; review Skills and reference material follow latest
 upstream. There is no separate release process. High/medium findings fail the
