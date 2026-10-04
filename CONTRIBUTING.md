@@ -11,7 +11,7 @@ implementation changes and can only be opened by this repository's
 collaborators. This restriction does not apply to issues, comments, or consumer
 repositories.
 
-Read the [domain language](CONTEXT.md) and relevant
+Read the [domain language](GLOSSARY.md) and relevant
 [architectural decisions](docs/adr/) before changing behavior. Work on a branch
 from current `main`; changes to `main` go through pull requests. Preserve
 applicable copyright and permission notices when reusing code or documentation.

@@ -3,7 +3,7 @@
 This repository uses one domain context. Its optional domain documents use
 this layout:
 
-    CONTEXT.md
+    GLOSSARY.md
     docs/adr/
 
 Before exploring, designing, or implementing a change, read the root glossary
