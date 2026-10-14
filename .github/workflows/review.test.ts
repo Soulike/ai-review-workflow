@@ -96,7 +96,7 @@ test("gate rejects skipped publication through the compiled output and environme
   }
 });
 
-test("pinned installation stages the binary used by the launcher and preserves arguments", async (t) => {
+test("compatible installation stages the binary used by the launcher and preserves arguments", async (t) => {
   const temporary = await mkdtemp(path.join(os.tmpdir(), "review-launcher-"));
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const binaryDir = path.join(temporary, "downloaded");
@@ -108,14 +108,14 @@ test("pinned installation stages the binary used by the launcher and preserves a
   await mkdir(actionsDir, { recursive: true });
   await writeFile(
     path.join(actionsDir, "install_copilot_cli.sh"),
-    'test "$#" = 1\ntest "$1" = "1.0.87"\n',
+    'test "$#" = 0\ntest "$GH_AW_COMPILED_VERSION" = "v0.91.12"\n',
   );
   const steps = compiled.getIn(["jobs", "agent", "steps"]);
   assert.ok(isSeq(steps));
   const installationIndex = steps.items.findIndex(
     (_, i) =>
       compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
-      "Install Copilot CLI for the custom launcher",
+      "Install compatible Copilot CLI for the custom launcher",
   );
   assert.ok(installationIndex >= 0);
   const installation = compiled.getIn([
@@ -126,6 +126,16 @@ test("pinned installation stages the binary used by the launcher and preserves a
     "run",
   ]);
   assert.ok(typeof installation === "string");
+  const compiledVersion = compiled.getIn([
+    "jobs",
+    "agent",
+    "steps",
+    installationIndex,
+    "env",
+    "GH_AW_COMPILED_VERSION",
+  ]);
+  assert.ok(typeof compiledVersion === "string");
+  assert.equal(compiledVersion, "v0.91.12");
   const executionIndex = steps.items.findIndex(
     (_, i) =>
       compiled.getIn(["jobs", "agent", "steps", i, "id"]) ===
@@ -148,6 +158,7 @@ test("pinned installation stages the binary used by the launcher and preserves a
     PATH: `${binaryDir}:${process.env.PATH}`,
     RUNNER_TEMP: temporary,
     AI_REVIEW_REASONING_EFFORT: "xhigh",
+    GH_AW_COMPILED_VERSION: compiledVersion,
   };
   await promisify(execFile)("bash", ["-eu", "-c", installation], { env });
   const { stdout } = await promisify(execFile)(
