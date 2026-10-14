@@ -16,6 +16,7 @@ import { Document, isMap, isScalar, isSeq, parseDocument } from "yaml";
 import { compilerVersion } from "../../scripts/lib/compiler-contract.ts";
 
 const root = new URL("../../", import.meta.url);
+const maxReasoningEffortMinimumVersion = "1.0.60";
 const compiledText = await readFile(
   new URL(".github/workflows/review.lock.yml", root),
   "utf8",
@@ -109,7 +110,7 @@ test("compatible installation stages the launcher binary and preserves arguments
   await mkdir(actionsDir, { recursive: true });
   await writeFile(
     path.join(actionsDir, "install_copilot_cli.sh"),
-    `test "$#" = 0\ntest "$GH_AW_COMPILED_VERSION" = "${compilerVersion}"\n`,
+    `test "$#" = 0\ntest "$GH_AW_COMPILED_VERSION" = "${compilerVersion}"\ntest "$GH_AW_COPILOT_MIN_VERSION" = "${maxReasoningEffortMinimumVersion}"\n`,
   );
   const steps = compiled.getIn(["jobs", "agent", "steps"]);
   assert.ok(isSeq(steps));
@@ -144,6 +145,16 @@ test("compatible installation stages the launcher binary and preserves arguments
   ]);
   assert.ok(typeof compiledVersion === "string");
   assert.equal(compiledVersion, compilerVersion);
+  const minimumVersion = compiled.getIn([
+    "jobs",
+    "agent",
+    "steps",
+    installationIndex,
+    "env",
+    "GH_AW_COPILOT_MIN_VERSION",
+  ]);
+  assert.ok(typeof minimumVersion === "string");
+  assert.equal(minimumVersion, maxReasoningEffortMinimumVersion);
   const executionIndex = steps.items.findIndex(
     (_, i) =>
       compiled.getIn(["jobs", "agent", "steps", i, "id"]) ===
@@ -167,6 +178,7 @@ test("compatible installation stages the launcher binary and preserves arguments
     RUNNER_TEMP: temporary,
     AI_REVIEW_REASONING_EFFORT: "xhigh",
     GH_AW_COMPILED_VERSION: compiledVersion,
+    GH_AW_COPILOT_MIN_VERSION: minimumVersion,
   };
   await promisify(execFile)("bash", ["-eu", "-c", installation], { env });
   await rm(fakeBinary);

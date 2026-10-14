@@ -97,6 +97,8 @@ pre-agent-steps:
   - name: Install compatible Copilot CLI for the custom launcher
     env:
       GH_AW_COMPILED_VERSION: v0.91.12
+      # `max` reasoning effort requires Copilot CLI 1.0.60 or newer.
+      GH_AW_COPILOT_MIN_VERSION: 1.0.60
     run: |
       bash "${RUNNER_TEMP}/gh-aw/actions/install_copilot_cli.sh"
       mkdir -p "${RUNNER_TEMP}/gh-aw/bin"

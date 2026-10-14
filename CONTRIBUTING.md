@@ -109,10 +109,11 @@ When changing workflow setup, preserve these implementation constraints:
   a dynamic `engine.args` expression in the generated execution command exceeds
   GitHub's expression size limit. A custom command disables automatic CLI
   installation, so the pre-Agent step invokes gh-aw's compatibility resolver
-  with the compiled gh-aw version and stages the selected binary on the
-  read-only runtime mount. Keep compiler/runtime versions coordinated in
-  [`compiler-contract.ts`](scripts/lib/compiler-contract.ts) and the pre-Agent
-  install environment.
+  with the compiled gh-aw version and a workflow-owned minimum of 1.0.60,
+  which is required by the public `max` reasoning-effort option. It stages the
+  selected binary on the read-only runtime mount. Keep compiler/runtime
+  versions coordinated in [`compiler-contract.ts`](scripts/lib/compiler-contract.ts)
+  and the pre-Agent install environment.
 - `network.allowed` in `review.md` owns the defaults. Native
   `network.allowed-input` adds the `network_allowed` input; the public interface
   forwards it unchanged and gh-aw merges additions before starting the firewall.
