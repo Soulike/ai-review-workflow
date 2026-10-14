@@ -13,7 +13,10 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { compileAgenticWorkflows } from "./lib/compiler-contract.ts";
+import {
+  compileAgenticWorkflows,
+  compilerVersion,
+} from "./lib/compiler-contract.ts";
 
 const execute = promisify(execFile);
 
@@ -21,6 +24,8 @@ test("standalone and gh-extension launchers check versions, pass arguments, and 
   const root = await mkdtemp(path.join(os.tmpdir(), "workflow-compiler-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const marker = path.join(root, "called");
+  const incompatibleVersion = "v0.0.0";
+  assert.notEqual(incompatibleVersion, compilerVersion);
   const script =
     'if [ "$1" = --version ]; then echo "gh aw version $TEST_VERSION"; else printf "%s\\n" "$@" > "$TEST_MARKER"; exit 23; fi\n';
   for (const standalone of [true, false]) {
@@ -37,15 +42,19 @@ test("standalone and gh-extension launchers check versions, pass arguments, and 
       PATH: root + path.delimiter + process.env.PATH,
       ...(standalone ? { GH_AW_COMPILER: compiler } : {}),
       TEST_MARKER: marker,
-      TEST_VERSION: "v0.87.10",
+      TEST_VERSION: incompatibleVersion,
     };
-    await assert.rejects(
-      compileAgenticWorkflows(env),
-      /Expected gh-aw compiler v0\.91\.12/u,
-    );
+    await assert.rejects(compileAgenticWorkflows(env), (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(
+        error.message,
+        `Expected gh-aw compiler ${compilerVersion}, received ${incompatibleVersion}.`,
+      );
+      return true;
+    });
     await assert.rejects(readFile(marker), { code: "ENOENT" });
     await assert.rejects(
-      compileAgenticWorkflows({ ...env, TEST_VERSION: "v0.91.12" }),
+      compileAgenticWorkflows({ ...env, TEST_VERSION: compilerVersion }),
       /exit code 23/u,
     );
     assert.deepEqual((await readFile(marker, "utf8")).trim().split("\n"), [
@@ -53,7 +62,7 @@ test("standalone and gh-extension launchers check versions, pass arguments, and 
       "--action-mode",
       "release",
       "--action-tag",
-      "v0.91.12",
+      compilerVersion,
       "--strict",
       "--validate",
       "--no-check-update",
@@ -99,7 +108,7 @@ test("the drift-check entrypoint rejects generated changes made by compilation",
   const compiler = path.join(root, "compiler");
   await writeFile(
     compiler,
-    '#!/bin/sh\nset -eu\nif [ "$1" = --version ]; then echo "gh aw version v0.91.12"; exit; fi\ncase "$TEST_DRIFT_ACTION" in\nwrite) printf "compiled\\n" >> "$TEST_DRIFT_PATH";;\ndelete) rm "$TEST_DRIFT_PATH";;\nesac\n',
+    `#!/bin/sh\nset -eu\nif [ "$1" = --version ]; then echo "gh aw version ${compilerVersion}"; exit; fi\ncase "$TEST_DRIFT_ACTION" in\nwrite) printf "compiled\\n" >> "$TEST_DRIFT_PATH";;\ndelete) rm "$TEST_DRIFT_PATH";;\nesac\n`,
   );
   await chmod(compiler, 0o755);
   const entrypoint = fileURLToPath(new URL("./check.ts", import.meta.url));

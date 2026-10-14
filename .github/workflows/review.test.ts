@@ -13,6 +13,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { Document, isMap, isScalar, isSeq, parseDocument } from "yaml";
+import { compilerVersion } from "../../scripts/lib/compiler-contract.ts";
 
 const root = new URL("../../", import.meta.url);
 const compiledText = await readFile(
@@ -96,7 +97,7 @@ test("gate rejects skipped publication through the compiled output and environme
   }
 });
 
-test("compatible installation stages the binary used by the launcher and preserves arguments", async (t) => {
+test("compatible installation stages the launcher binary and preserves arguments", async (t) => {
   const temporary = await mkdtemp(path.join(os.tmpdir(), "review-launcher-"));
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const binaryDir = path.join(temporary, "downloaded");
@@ -108,16 +109,23 @@ test("compatible installation stages the binary used by the launcher and preserv
   await mkdir(actionsDir, { recursive: true });
   await writeFile(
     path.join(actionsDir, "install_copilot_cli.sh"),
-    'test "$#" = 0\ntest "$GH_AW_COMPILED_VERSION" = "v0.91.12"\n',
+    `test "$#" = 0\ntest "$GH_AW_COMPILED_VERSION" = "${compilerVersion}"\n`,
   );
   const steps = compiled.getIn(["jobs", "agent", "steps"]);
   assert.ok(isSeq(steps));
-  const installationIndex = steps.items.findIndex(
-    (_, i) =>
-      compiled.getIn(["jobs", "agent", "steps", i, "name"]) ===
-      "Install compatible Copilot CLI for the custom launcher",
+  const installationIndices = steps.items.flatMap((_, i) => {
+    const run = compiled.getIn(["jobs", "agent", "steps", i, "run"]);
+    return typeof run === "string" && run.includes("install_copilot_cli.sh")
+      ? [i]
+      : [];
+  });
+  assert.equal(
+    installationIndices.length,
+    1,
+    "expected exactly one Copilot installer in the agent job",
   );
-  assert.ok(installationIndex >= 0);
+  const installationIndex = installationIndices[0];
+  assert.ok(installationIndex !== undefined);
   const installation = compiled.getIn([
     "jobs",
     "agent",
@@ -135,7 +143,7 @@ test("compatible installation stages the binary used by the launcher and preserv
     "GH_AW_COMPILED_VERSION",
   ]);
   assert.ok(typeof compiledVersion === "string");
-  assert.equal(compiledVersion, "v0.91.12");
+  assert.equal(compiledVersion, compilerVersion);
   const executionIndex = steps.items.findIndex(
     (_, i) =>
       compiled.getIn(["jobs", "agent", "steps", i, "id"]) ===
@@ -161,18 +169,23 @@ test("compatible installation stages the binary used by the launcher and preserv
     GH_AW_COMPILED_VERSION: compiledVersion,
   };
   await promisify(execFile)("bash", ["-eu", "-c", installation], { env });
+  await rm(fakeBinary);
+  const executionEnv = {
+    ...env,
+    PATH: path.join(temporary, "empty-path"),
+  };
   const { stdout } = await promisify(execFile)(
-    "bash",
+    "/bin/bash",
     ["-c", command, "launcher", "--model", "model with spaces"],
-    { env },
+    { env: executionEnv },
   );
   assert.equal(
     stdout,
     "--reasoning-effort\nxhigh\n--model\nmodel with spaces\n",
   );
   await assert.rejects(
-    promisify(execFile)("bash", ["-c", command], {
-      env: { ...env, AI_REVIEW_REASONING_EFFORT: "" },
+    promisify(execFile)("/bin/bash", ["-c", command], {
+      env: { ...executionEnv, AI_REVIEW_REASONING_EFFORT: "" },
     }),
     /reasoning effort is required/u,
   );
