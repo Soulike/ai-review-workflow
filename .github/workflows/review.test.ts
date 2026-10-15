@@ -110,7 +110,7 @@ test("compatible installation stages the launcher binary and preserves arguments
   await mkdir(actionsDir, { recursive: true });
   await writeFile(
     path.join(actionsDir, "install_copilot_cli.sh"),
-    `test "$#" = 0\ntest "$GH_AW_COMPILED_VERSION" = "${compilerVersion}"\ntest "$GH_AW_COPILOT_MIN_VERSION" = "${maxReasoningEffortMinimumVersion}"\n`,
+    `set -eu\ntest "$#" = 0\ntest "$GH_AW_COMPILED_VERSION" = "${compilerVersion}"\ntest "$GH_AW_COPILOT_MIN_VERSION" = "${maxReasoningEffortMinimumVersion}"\n`,
   );
   const steps = compiled.getIn(["jobs", "agent", "steps"]);
   assert.ok(isSeq(steps));
