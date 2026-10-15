@@ -284,6 +284,9 @@ publication, or verdict contract. Keep the trusted checkout unchanged.
 
 Use read-only GitHub tools for PR state, files, checks, linked issues, reviews,
 and review threads. Fetch every required page and all comments of each thread.
+When a tool path is unavailable or blocked but allowed alternatives provide
+enough evidence for a complete review, report `missing_tool` with those
+alternatives and continue. This diagnostic does not replace `report_incomplete`.
 If the evidence needed for a complete review cannot be obtained, call
 `report_incomplete` and do not submit a review. Use Tavily search and extract
 when current external primary sources are needed. Do not issue GitHub API

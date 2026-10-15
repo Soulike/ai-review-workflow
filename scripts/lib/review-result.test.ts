@@ -8,6 +8,12 @@ const review = {
   body: "A readable review.",
 };
 const verdict = { type: "record_review_verdict", verdict: "approved" };
+const missingTool = {
+  type: "missing_tool",
+  tool: "Direct registry metadata request via Bash",
+  reason: "security",
+  alternatives: "Use read-only advisory and package metadata sources.",
+};
 
 test("uses only the custom verdict, independent of review and inline prose", () => {
   for (const body of [
@@ -35,6 +41,22 @@ test("uses only the custom verdict, independent of review and inline prose", () 
   }
 });
 
+test("ignores non-failing safe outputs when the review is complete", () => {
+  for (const diagnostic of [
+    missingTool,
+    { type: "noop", message: "No additional action needed." },
+    { type: "future_diagnostic", detail: "New non-failing output." },
+  ]) {
+    assert.deepEqual(
+      resultFromSafeOutputs({
+        items: [diagnostic, review, verdict],
+        errors: [],
+      }),
+      { verdict: "approved" },
+    );
+  }
+});
+
 test("rejects missing, duplicate, incomplete and failed safe-output streams", () => {
   for (const output of [
     null,
@@ -42,6 +64,8 @@ test("rejects missing, duplicate, incomplete and failed safe-output streams", ()
     { items: [] },
     { items: [review] },
     { items: [verdict] },
+    { items: [missingTool, review] },
+    { items: [missingTool, verdict] },
     { items: [review, verdict, verdict] },
     { items: [review, review, verdict] },
     { items: [review, { ...verdict, verdict: "unknown" }] },
@@ -49,14 +73,11 @@ test("rejects missing, duplicate, incomplete and failed safe-output streams", ()
     { items: [{ ...review, event: "APPROVE" }, verdict] },
     { items: [review, verdict], errors: ["tool failed"] },
     { items: [review, verdict], errors: "malformed" },
-    ...[
-      "report_incomplete",
-      "missing_data",
-      "missing_tool",
-      "noop",
-      "add_comment",
-    ].map((type) => ({ items: [review, verdict, { type }] })),
+    ...["report_incomplete", "missing_data"].map((type) => ({
+      items: [review, verdict, { type }],
+    })),
     { items: [null, review, verdict] },
+    { items: [{ type: 1 }, review, verdict] },
   ])
     assert.throws(() => resultFromSafeOutputs(output));
 });
