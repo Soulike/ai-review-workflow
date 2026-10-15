@@ -1,6 +1,8 @@
 export type ReviewVerdict = "approved" | "needs-change";
 export type ReviewResult = { verdict: ReviewVerdict };
 
+const failingSafeOutputTypes = new Set(["missing_data", "report_incomplete"]);
+
 export function readReviewResult(value: unknown): ReviewResult {
   if (
     !value ||
@@ -28,9 +30,15 @@ export function resultFromSafeOutputs(output: unknown): ReviewResult {
   let reviews = 0;
   const results: ReviewResult[] = [];
   for (const item of output.items) {
-    if (!item || typeof item !== "object" || !("type" in item)) {
+    if (
+      !item ||
+      typeof item !== "object" ||
+      !("type" in item) ||
+      typeof item.type !== "string"
+    ) {
       throw new Error(error);
     }
+    if (failingSafeOutputTypes.has(item.type)) throw new Error(error);
     switch (item.type) {
       case "record_review_verdict":
         results.push(readReviewResult(item));
@@ -41,10 +49,6 @@ export function resultFromSafeOutputs(output: unknown): ReviewResult {
         }
         reviews += 1;
         break;
-      case "create_pull_request_review_comment":
-        break;
-      default:
-        throw new Error(error);
     }
   }
   const result = results[0];
