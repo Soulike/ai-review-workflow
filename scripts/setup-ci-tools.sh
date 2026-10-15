@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-gh extension install github/gh-aw --pin v0.89.21
+gh extension install github/gh-aw --pin v0.91.12
 tools_dir="$(mktemp -d "${RUNNER_TEMP}/workflow-tools.XXXXXX")"
 gh release download v1.7.12 --repo rhysd/actionlint \
   --pattern actionlint_1.7.12_linux_amd64.tar.gz \
