@@ -28,6 +28,7 @@ inlined-imports: true
 
 engine:
   id: copilot
+  concurrency: "gh-aw-copilot-review-${{ github.run_id }}"
   model: ${{ inputs.model || 'auto' }}
   command: >-
     exec "${RUNNER_TEMP}/gh-aw/bin/copilot" --reasoning-effort "${AI_REVIEW_REASONING_EFFORT:?reasoning effort is required}"

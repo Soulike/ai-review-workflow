@@ -142,10 +142,13 @@ jobs:
 ```
 
 Here, `secrets.TAVILY_API_KEY` is the repository secret selected for the example;
-the key on the left is the required workflow secret name. Job-level concurrency
-cancels superseded review calls without cancelling unrelated jobs in the same
-workflow. Choose a group that does not collide with other work in your
-repository; the shared workflow does not manage per-PR cancellation for you.
+the key on the left is the required workflow secret name.
+
+The shared workflow allows agent stages from different runs to execute
+concurrently. Job-level concurrency in the example cancels superseded review
+calls for the same PR without cancelling unrelated jobs in the same workflow.
+Choose a group that does not collide with other work in your repository; the
+shared workflow does not manage per-PR cancellation for you.
 
 ## Configure the review
 
