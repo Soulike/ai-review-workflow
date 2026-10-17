@@ -53,7 +53,7 @@ tools:
     mode: local
     # The current guard misclassifies v2 issue envelopes. Recheck on gh-aw
     # upgrades; removal criteria: https://github.com/Soulike/ai-review-workflow/issues/23
-    version: "v1.14.0@sha256:7aaeeec9ae4fe9a736d100c1ff0798f3c219b5009e05f5d3945fcacb13cc196b"
+    version: "v1.14.0"
     read-only: true
     github-token: ${{ secrets.GITHUB_TOKEN }}
     toolsets: [all, dependabot]
