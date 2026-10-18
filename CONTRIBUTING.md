@@ -26,11 +26,11 @@ language features, not a fixed CI selection.
 pnpm install --frozen-lockfile --ignore-scripts
 ```
 
-Workflow validation also needs Git, GitHub CLI, gh-aw **v0.91.12**, and
+Workflow validation also needs Git, GitHub CLI, gh-aw **v0.92.0**, and
 **actionlint v1.7.12**. If the gh-aw extension is not already installed:
 
 ```sh
-gh extension install github/gh-aw --pin v0.91.12
+gh extension install github/gh-aw --pin v0.92.0
 ```
 
 If another gh-aw version is installed, select an isolated official release
