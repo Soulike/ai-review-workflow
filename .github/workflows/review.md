@@ -100,7 +100,7 @@ pre-agent-steps:
       persist-credentials: false
   - name: Install compatible Copilot CLI for the custom launcher
     env:
-      GH_AW_COMPILED_VERSION: v0.91.12
+      GH_AW_COMPILED_VERSION: v0.92.0
       # `max` reasoning effort requires Copilot CLI 1.0.60 or newer.
       GH_AW_COPILOT_MIN_VERSION: 1.0.60
     run: |

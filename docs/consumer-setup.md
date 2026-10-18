@@ -162,7 +162,7 @@ variable does not supply a valid required reasoning effort.
 | Input                | Contract                                                                                                                                                                                                                                              |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `reasoning-effort`   | Required: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Empty, whitespace-padded, and unsupported values fail before inference. The selected model must also support the effort.                                                     |
-| `model`              | Optional; defaults to `auto`. Passed to Copilot; support and access depend on the runtime and account. Copilot and gh-aw may resolve an identifier to a different model.                                                                              |
+| `model`              | Optional; defaults to `auto`. Support and access depend on the runtime and account. gh-aw may resolve aliases; if Copilot substitutes another model for the resolved selection, the review fails. `auto` delegates model choice.                      |
 | `review-prompt-path` | Optional repository-root-relative `.md` or `.markdown` path. Empty means shared criteria only. The file must be readable and resolve within the repository; absolute paths, directories, and paths or symlinks that escape the repository fail setup. |
 | `network_allowed`    | Optional comma-separated domains or gh-aw ecosystem identifiers. Empty keeps the default allowlist; entries add to it. See [extra network access](#extra-network-access).                                                                             |
 
@@ -241,6 +241,10 @@ trigger a new supported PR event rather than rerunning the old event.
   caller workflow and follow [the event-policy setup](#allow-the-pull_request_target-event).
   If an organization or enterprise policy blocks the event, ask its administrator
   to update it, then trigger a fresh supported PR event.
+- **A configured model is unavailable or was substituted:** select a model
+  available to your workflow's agentic-workflows integration, or use `auto` to
+  delegate model choice. Trigger a new supported PR event after changing the
+  caller's configuration. Repeating the same unavailable selection will fail.
 - **Setup, inference, or publication failed:** inspect the failed job's log,
   correct the cause, and choose **Re-run failed jobs**. Successful stages can be
   reused. If required evidence is inaccessible, the review cannot complete;
