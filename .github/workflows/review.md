@@ -52,9 +52,6 @@ tools:
   bash: [":*"]
   github:
     mode: local
-    # Keep this compatibility pin until v2 response handling and a deployed
-    # review satisfy https://github.com/Soulike/ai-review-workflow/issues/23
-    version: "v1.14.0"
     read-only: true
     github-token: ${{ secrets.GITHUB_TOKEN }}
     toolsets: [all, dependabot]
