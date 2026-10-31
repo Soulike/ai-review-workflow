@@ -9,7 +9,7 @@ const review = {
 };
 const verdict = { type: "record_review_verdict", verdict: "approved" };
 const missingTool = {
-  type: "missing_tool",
+  type: "report_missing_tool",
   tool: "Direct registry metadata request via Bash",
   reason: "security",
   alternatives: "Use read-only advisory and package metadata sources.",
@@ -73,9 +73,11 @@ test("rejects missing, duplicate, incomplete and failed safe-output streams", ()
     { items: [{ ...review, event: "APPROVE" }, verdict] },
     { items: [review, verdict], errors: ["tool failed"] },
     { items: [review, verdict], errors: "malformed" },
-    ...["report_incomplete", "missing_data"].map((type) => ({
-      items: [review, verdict, { type }],
-    })),
+    ...["report_incomplete", "missing_data", "report_missing_data"].map(
+      (type) => ({
+        items: [review, verdict, { type }],
+      }),
+    ),
     { items: [null, review, verdict] },
     { items: [{ type: 1 }, review, verdict] },
   ])

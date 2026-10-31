@@ -52,8 +52,8 @@ tools:
   bash: [":*"]
   github:
     mode: local
-    # The current guard misclassifies v2 issue envelopes. Recheck on gh-aw
-    # upgrades; removal criteria: https://github.com/Soulike/ai-review-workflow/issues/23
+    # Keep this compatibility pin until v2 response handling and a deployed
+    # review satisfy https://github.com/Soulike/ai-review-workflow/issues/23
     version: "v1.14.0"
     read-only: true
     github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -100,7 +100,7 @@ pre-agent-steps:
       persist-credentials: false
   - name: Install compatible Copilot CLI for the custom launcher
     env:
-      GH_AW_COMPILED_VERSION: v0.92.0
+      GH_AW_COMPILED_VERSION: v1.0.1
       # `max` reasoning effort requires Copilot CLI 1.0.60 or newer.
       GH_AW_COPILOT_MIN_VERSION: 1.0.60
     run: |
@@ -176,9 +176,9 @@ safe-outputs:
     allowed-events: [COMMENT]
     commit-id: ${{ github.event.pull_request.head.sha }}
     footer: always
-  missing-tool:
+  report-missing-tool:
     create-issue: false
-  missing-data:
+  report-missing-data:
     create-issue: false
   noop:
     report-as-issue: false
@@ -231,8 +231,8 @@ jobs:
     needs: [prepare, record_review_verdict]
     if: needs.agent.result == 'success' && needs.record_review_verdict.result == 'success'
 
-  ai_review_gate:
-    name: AI review gate
+  validate_review:
+    name: Validate review
     if: always()
     needs: [prepare, agent, safe_outputs, record_review_verdict]
     runs-on: ubuntu-latest
@@ -263,6 +263,23 @@ jobs:
           AI_REVIEW_PUBLICATION_STATUS: ${{ needs.safe_outputs.outputs.process_safe_outputs_status }}
           AI_REVIEW_PUBLICATION_ITEMS_APPLIED: ${{ needs.safe_outputs.outputs.process_safe_outputs_items_applied }}
         run: node scripts/review-gate.ts /tmp/review-result/review-result.json
+
+  ai_review_gate:
+    name: AI review gate
+    detection-gate: status-only
+    if: always()
+    needs: [validate_review]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require successful review validation
+        env:
+          AI_REVIEW_VALIDATION_RESULT: ${{ needs.validate_review.result }}
+        run: |
+          if [ "$AI_REVIEW_VALIDATION_RESULT" != success ]; then
+            echo "::error::AI review validation did not succeed (${AI_REVIEW_VALIDATION_RESULT:-missing})."
+            exit 1
+          fi
 ---
 
 # Repository-aware pull-request review
@@ -289,7 +306,7 @@ publication, or verdict contract. Keep the trusted checkout unchanged.
 Use read-only GitHub tools for PR state, files, checks, linked issues, reviews,
 and review threads. Fetch every required page and all comments of each thread.
 When a tool path is unavailable or blocked but allowed alternatives provide
-enough evidence for a complete review, report `missing_tool` with those
+enough evidence for a complete review, report `report_missing_tool` with those
 alternatives and continue. This diagnostic does not replace `report_incomplete`.
 If the evidence needed for a complete review cannot be obtained, call
 `report_incomplete` and do not submit a review. Use Tavily search and extract

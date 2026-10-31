@@ -213,7 +213,7 @@ deployed `pull_request_target` workflow. Before making the gate required:
 2. Confirm a `github-actions[bot]` comment review identifies the reviewed head
    and model. With successful execution and publication, an `approved` verdict
    passes the gate; `needs-change` fails it. High or medium findings require
-   changes. The gate reads a structured result, not the review's Markdown.
+   changes. The gate uses a structured result, not the review's Markdown.
 3. Select the check name GitHub actually emits in your branch's required-check
    settings. With the example's job name, expect
    `Review / Engine / AI review gate`; renaming the calling job changes the
@@ -245,18 +245,19 @@ trigger a new supported PR event rather than rerunning the old event.
   available to your workflow's agentic-workflows integration, or use `auto` to
   delegate model choice. Trigger a new supported PR event after changing the
   caller's configuration. Repeating the same unavailable selection will fail.
-- **Setup, inference, or publication failed:** inspect the failed job's log,
-  correct the cause, and choose **Re-run failed jobs**. Successful stages can be
-  reused. If required evidence is inaccessible, the review cannot complete;
-  do not supply a broader token to work around the public interface.
+- **Setup, inference, threat detection, validation, or publication failed:**
+  inspect the failed job's log, correct the cause, and choose **Re-run failed
+  jobs**. Successful stages can be reused. If required evidence is inaccessible,
+  the review cannot complete; do not supply a broader token to work around the
+  public interface.
 - **A required artifact expired, was deleted, or conflicts on rerun:** choose
   **Re-run all jobs**. The verdict artifact is retained for **30 days**; other
   artifacts follow gh-aw and repository retention settings.
 
-Re-running only the gate reads the existing result and does not publish again.
-Re-running publication may leave another visible review; there is no comment
-deduplication or cleanup. Failed prerequisites or a missing or invalid structured
-result cannot pass the gate.
+Re-running only the gate reuses the validation job's result and does not publish
+again. Re-running publication may leave another visible review; there is no
+comment deduplication or cleanup. Failed prerequisites or a missing or invalid
+structured result cannot pass the gate.
 
 Consumers follow `main`, with no release or version-bump process. If an upstream
 change breaks reviews, report the run URL and workflow implementation SHA.
