@@ -28,7 +28,7 @@ const { stdout, stderr } = await promisify(execFile)(
     "-ignore",
     'unknown permission scope "(copilot-requests|vulnerability-alerts)"',
     "-ignore",
-    'property "workflow_(repository|sha)" is not defined',
+    'property "workflow_(repository|sha|ref)" is not defined',
     "-ignore",
     'unexpected key "queue" for "concurrency"',
     ".github/workflows/ci.yml",
