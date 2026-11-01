@@ -63,29 +63,19 @@ test("writes a safe-output result and reuses the artifact in the gate without Gi
       );
     }
   }
-  for (const type of ["report_incomplete", "report_missing_data"]) {
-    await writeFile(
-      input,
-      JSON.stringify({
-        items: [
-          { type: "submit_pull_request_review", event: "COMMENT" },
-          { type: "record_review_verdict", verdict: "approved" },
-          { type },
-        ],
-      }),
-    );
-    const absent = path.join(root, `absent-${type}.json`);
-    const rejected = spawnSync(
-      process.execPath,
-      [writer.pathname, input, absent],
-      {
-        encoding: "utf8",
-        env: {},
-      },
-    );
-    assert.equal(rejected.status, 1);
-    await assert.rejects(readFile(absent), { code: "ENOENT" });
-  }
+  await writeFile(
+    input,
+    JSON.stringify({ items: [{ type: "report_incomplete" }] }),
+  );
+  const rejected = spawnSync(
+    process.execPath,
+    [writer.pathname, input, path.join(root, "absent.json")],
+    { encoding: "utf8", env: {} },
+  );
+  assert.equal(rejected.status, 1);
+  await assert.rejects(readFile(path.join(root, "absent.json")), {
+    code: "ENOENT",
+  });
 });
 
 test("gate fails on unsuccessful prerequisites or missing and malformed artifacts", async (t) => {

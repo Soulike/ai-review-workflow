@@ -26,11 +26,11 @@ language features, not a fixed CI selection.
 pnpm install --frozen-lockfile --ignore-scripts
 ```
 
-Workflow validation also needs Git, GitHub CLI, gh-aw **v1.0.1**, and
+Workflow validation also needs Git, GitHub CLI, gh-aw **v0.92.0**, and
 **actionlint v1.7.12**. If the gh-aw extension is not already installed:
 
 ```sh
-gh extension install github/gh-aw --pin v1.0.1
+gh extension install github/gh-aw --pin v0.92.0
 ```
 
 If another gh-aw version is installed, select an isolated official release
@@ -120,11 +120,10 @@ When changing workflow setup, preserve these implementation constraints:
 
 For verdict and publication changes, preserve the
 [stateless structured-result contract](docs/adr/0008-use-stateless-structured-review-results.md).
-The detection-gated validation job consumes the result artifact, prerequisite
-job outcomes, and applied publication status. The status-only gate always runs
-and requires that validation to succeed, including when threat detection skips
-validation. A successful publication job that skipped the required review cannot
-satisfy the gate. Review prose and current PR state are not gate inputs.
+The gate consumes the result artifact, prerequisite job outcomes, and applied
+publication status. A successful publication job that skipped the required
+review cannot satisfy the gate. Review prose and current PR state are not gate
+inputs.
 
 ## Test and validate your change
 

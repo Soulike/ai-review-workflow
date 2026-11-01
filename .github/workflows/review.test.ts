@@ -30,11 +30,11 @@ test("gate rejects skipped publication through the compiled output and environme
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const artifact = path.join(temporary, "review-result.json");
   await writeFile(artifact, JSON.stringify({ verdict: "approved" }));
-  const gateSteps = compiled.getIn(["jobs", "validate_review", "steps"]);
+  const gateSteps = compiled.getIn(["jobs", "ai_review_gate", "steps"]);
   assert.ok(isSeq(gateSteps));
   const gateIndex = gateSteps.items.findIndex(
     (_, i) =>
-      compiled.getIn(["jobs", "validate_review", "steps", i, "name"]) ===
+      compiled.getIn(["jobs", "ai_review_gate", "steps", i, "name"]) ===
       "Enforce structured verdict",
   );
   assert.ok(gateIndex >= 0);
@@ -69,7 +69,7 @@ test("gate rejects skipped publication through the compiled output and environme
       }),
     );
     const env = resolveMapping(
-      compiled.getIn(["jobs", "validate_review", "steps", gateIndex, "env"]),
+      compiled.getIn(["jobs", "ai_review_gate", "steps", gateIndex, "env"]),
       new Document({
         needs: {
           prepare: { result: "success" },
@@ -95,61 +95,6 @@ test("gate rejects skipped publication through the compiled output and environme
         ? /AI review approved/u
         : /Required review was not published/u,
     );
-  }
-});
-
-test("required gate runs after detection and fails if review validation did not succeed", () => {
-  const job = compiled.getIn(["jobs", "ai_review_gate"]);
-  assert.ok(isMap(job));
-  assert.equal(compiled.getIn(["jobs", "ai_review_gate", "if"]), "always()");
-  const needs = compiled.getIn(["jobs", "ai_review_gate", "needs"]);
-  assert.ok(isSeq(needs));
-  assert.ok(
-    needs.items.some(
-      (item) => isScalar(item) && item.value === "validate_review",
-    ),
-  );
-  assert.ok(
-    needs.items.some((item) => isScalar(item) && item.value === "detection"),
-  );
-  const validationCondition = compiled.getIn(["jobs", "validate_review", "if"]);
-  assert.ok(typeof validationCondition === "string");
-  assert.match(validationCondition, /needs\.detection\.result == 'success'/u);
-  assert.match(
-    validationCondition,
-    /needs\.detection\.outputs\.detection_success == 'true'/u,
-  );
-  const steps = compiled.getIn(["jobs", "ai_review_gate", "steps"]);
-  assert.ok(isSeq(steps));
-  const index = steps.items.findIndex(
-    (_, i) =>
-      compiled.getIn(["jobs", "ai_review_gate", "steps", i, "name"]) ===
-      "Require successful review validation",
-  );
-  assert.ok(index >= 0);
-  assert.equal(
-    compiled.getIn([
-      "jobs",
-      "ai_review_gate",
-      "steps",
-      index,
-      "env",
-      "AI_REVIEW_VALIDATION_RESULT",
-    ]),
-    "${{ needs.validate_review.result }}",
-  );
-  const run = compiled.getIn(["jobs", "ai_review_gate", "steps", index, "run"]);
-  assert.ok(typeof run === "string");
-  for (const result of ["success", "failure", "cancelled", "skipped", ""]) {
-    const execution: { status: number | null } = spawnSync(
-      "/bin/bash",
-      ["-e", "-c", run],
-      {
-        encoding: "utf8",
-        env: { AI_REVIEW_VALIDATION_RESULT: result },
-      },
-    );
-    assert.equal(execution.status, result === "success" ? 0 : 1, result);
   }
 });
 
