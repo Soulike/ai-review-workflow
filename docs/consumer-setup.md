@@ -178,10 +178,31 @@ commit, not the proposed head. Land a new prompt before enabling its path; a
 prompt first added in a PR cannot judge that same PR. Shared review Skills and
 reference material follow their latest upstream versions.
 
+The shared reviewer treats the complete pull request as its review subject. It
+first forms a provisional, descriptive account from the trusted base, exact
+diff, complete affected responsibility, and base contracts. It then reconciles
+that account with the PR description, linked material, comments, earlier
+reviews, and check results. Those materials can supply valid intent, decisions,
+and evidence, but neither confidence nor repetition establishes correctness.
+The reviewer checks material claims in proportion to their impact and judges
+the change rationale separately from its implementation. When no authoritative
+specification exists, it uses the narrowest goal supported by the repository and
+change unless material ambiguity prevents a complete review. Finding severity
+follows plausible impact, reachability, and affected contracts rather than the
+confidence, repetition, or tone of PR prose or earlier reviews.
+
+Installed Skills and reference material remain a supplemental review library.
+The shared workflow describes its core judgment process directly and lets the
+reviewer select relevant guidance for the responsibilities affected by each
+change; repository criteria can add project-specific standards without owning
+or replacing that process.
+
 The shared [review instructions](../.github/workflows/review.md#review-body) lead
 with the AI review's conclusion, followed by a brief explanation and visible
-model, commit, and severity details. Summaries use the main language of the PR
-description, with English as the fallback; wording varies with the change.
+model, commit, and severity details. The explanation identifies the final
+understood objective and whether its rationale and implementation are supported.
+Summaries use the main language of the PR description, with English as the
+fallback; wording varies with the change.
 
 ### Extra network access
 
