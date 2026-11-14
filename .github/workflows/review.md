@@ -35,6 +35,7 @@ engine:
 
 env:
   AI_REVIEW_REASONING_EFFORT: ${{ inputs.reasoning-effort }}
+  DISABLE_TELEMETRY: "1"
 
 permissions:
   actions: read
@@ -116,12 +117,14 @@ pre-agent-steps:
     run: node workflow/scripts/prepare-review.ts --repository-root consumer
   - name: Install latest review Skills
     run: npx --yes skills@latest add mattpocock/skills --agent github-copilot --skill codebase-design tdd writing-for-agents --copy --yes --full-depth
-  - name: Install latest knowledge-base plugin
+  - name: Install latest review plugins
     env:
       COPILOT_GITHUB_TOKEN: ${{ github.token }}
     run: |
       copilot plugin marketplace add Soulike/knowledge-base
+      copilot plugin marketplace add GoogleChrome/modern-web-guidance
       copilot plugin install knowledge-base@knowledge-base
+      copilot plugin install modern-web-guidance@googlechrome
       copilot plugin list
   - name: Remove and verify Git credentials
     run: |
