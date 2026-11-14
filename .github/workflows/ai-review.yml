@@ -50,3 +50,19 @@ jobs:
       network_allowed: ${{ inputs.network_allowed }}
     secrets:
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+
+  ai_review_gate:
+    name: AI review gate
+    if: always()
+    needs: [engine]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require completed Engine
+        env:
+          ENGINE_RESULT: ${{ needs.engine.result }}
+        run: |
+          if [ "$ENGINE_RESULT" != success ]; then
+            printf 'Engine did not succeed (%s).\n' "${ENGINE_RESULT:-missing}" >&2
+            exit 1
+          fi

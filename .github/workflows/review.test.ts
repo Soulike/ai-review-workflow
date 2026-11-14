@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile, spawnSync } from "node:child_process";
+import { execFile, spawnSync, type SpawnSyncReturns } from "node:child_process";
 import {
   chmod,
   mkdtemp,
@@ -23,6 +23,100 @@ const compiledText = await readFile(
 );
 const compiled = parseDocument(compiledText);
 
+function resolveMapping(
+  mapping: unknown,
+  context: Document,
+): Record<string, string> {
+  assert.ok(isMap(mapping));
+  return Object.fromEntries(
+    mapping.items.map(({ key, value }) => {
+      assert.ok(isScalar(key) && typeof key.value === "string");
+      assert.ok(isScalar(value) && typeof value.value === "string");
+      const reference = /^\$\{\{\s*([\w.]+)\s*\}\}$/u.exec(value.value)?.[1];
+      assert.ok(reference, `Unsupported fixture expression: ${value.value}`);
+      const resolved = context.getIn(reference.split(".")) ?? "";
+      assert.ok(typeof resolved === "string");
+      return [key.value, resolved];
+    }),
+  );
+}
+
+test("inner completion command rejects every unsuccessful mandatory review stage", () => {
+  const jobs = [
+    "prepare",
+    "agent",
+    "detection",
+    "safe_outputs",
+    "record_review_verdict",
+    "ai_review_validate",
+  ];
+  const needs = Object.fromEntries(
+    jobs.map((job) => [job, { result: "success" }]),
+  );
+  const steps = compiled.getIn(["jobs", "ai_review_gate", "steps"]);
+  assert.ok(isSeq(steps));
+  const step = steps.items.find(
+    (item) =>
+      isMap(item) && item.get("name") === "Require completed review stages",
+  );
+  assert.ok(isMap(step));
+  const command = step.get("run");
+  assert.ok(typeof command === "string");
+  const run = (context: Document) =>
+    spawnSync("/bin/bash", ["-e", "-o", "pipefail", "-c", command], {
+      encoding: "utf8",
+      env: resolveMapping(step.get("env"), context),
+    });
+  assert.equal(run(new Document({ needs })).status, 0);
+  for (const job of jobs) {
+    for (const result of ["failure", "cancelled", "skipped", ""]) {
+      const rejected = run(
+        new Document({ needs: { ...needs, [job]: { result } } }),
+      );
+      assert.equal(rejected.status, 1, `${job}=${result}`);
+      assert.ok(rejected.stderr.includes(job), rejected.stderr);
+    }
+    assert.equal(
+      run(new Document({ needs: { ...needs, [job]: {} } })).status,
+      1,
+      `missing ${job} result`,
+    );
+  }
+});
+
+test("outer gate command requires successful completion of the entire Engine", async () => {
+  const wrapper = parseDocument(
+    await readFile(new URL(".github/workflows/ai-review.yml", root), "utf8"),
+  );
+  const step = wrapper.getIn(["jobs", "ai_review_gate", "steps", 0]);
+  assert.ok(isMap(step));
+  const command = step.get("run");
+  assert.ok(typeof command === "string");
+  for (const [result, exitCode] of [
+    ["success", 0],
+    ["failure", 1],
+    ["cancelled", 1],
+    ["skipped", 1],
+    ["", 1],
+  ] as const) {
+    const outcome: SpawnSyncReturns<string> = spawnSync(
+      "/bin/bash",
+      ["-e", "-c", command],
+      {
+        encoding: "utf8",
+        env: resolveMapping(
+          step.get("env"),
+          new Document({ needs: { engine: { result } } }),
+        ),
+      },
+    );
+    assert.equal(outcome.status, exitCode, result);
+    if (exitCode !== 0) {
+      assert.match(outcome.stderr, /Engine/u);
+    }
+  }
+});
+
 test("gate rejects skipped publication through the compiled output and environment wiring", async (t) => {
   const temporary = await mkdtemp(
     path.join(os.tmpdir(), "review-publication-"),
@@ -30,29 +124,14 @@ test("gate rejects skipped publication through the compiled output and environme
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const artifact = path.join(temporary, "review-result.json");
   await writeFile(artifact, JSON.stringify({ verdict: "approved" }));
-  const gateSteps = compiled.getIn(["jobs", "ai_review_gate", "steps"]);
+  const gateSteps = compiled.getIn(["jobs", "ai_review_validate", "steps"]);
   assert.ok(isSeq(gateSteps));
   const gateIndex = gateSteps.items.findIndex(
     (_, i) =>
-      compiled.getIn(["jobs", "ai_review_gate", "steps", i, "name"]) ===
+      compiled.getIn(["jobs", "ai_review_validate", "steps", i, "name"]) ===
       "Enforce structured verdict",
   );
   assert.ok(gateIndex >= 0);
-
-  function resolveMapping(mapping: unknown, context: Document) {
-    assert.ok(isMap(mapping));
-    return Object.fromEntries(
-      mapping.items.map(({ key, value }) => {
-        assert.ok(isScalar(key) && typeof key.value === "string");
-        assert.ok(isScalar(value) && typeof value.value === "string");
-        const reference = /^\$\{\{\s*([\w.]+)\s*\}\}$/u.exec(value.value)?.[1];
-        assert.ok(reference, `Unsupported fixture expression: ${value.value}`);
-        const resolved = context.getIn(reference.split(".")) ?? "";
-        assert.ok(typeof resolved === "string");
-        return [key.value, resolved];
-      }),
-    );
-  }
 
   for (const [status, applied, exitCode] of [
     ["success", "1", 0],
@@ -69,7 +148,7 @@ test("gate rejects skipped publication through the compiled output and environme
       }),
     );
     const env = resolveMapping(
-      compiled.getIn(["jobs", "ai_review_gate", "steps", gateIndex, "env"]),
+      compiled.getIn(["jobs", "ai_review_validate", "steps", gateIndex, "env"]),
       new Document({
         needs: {
           prepare: { result: "success" },

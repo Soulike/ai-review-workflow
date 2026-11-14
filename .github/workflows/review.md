@@ -52,10 +52,6 @@ tools:
   bash: [":*"]
   github:
     mode: local
-    # Before the next gh-aw upgrade, verify its selected gh-aw-mcpg fixes nested
-    # review_threads provenance and a fresh consumer run can read every comment:
-    # https://github.com/github/gh-aw-mcpg/issues/15838
-    version: "v1.14.0"
     read-only: true
     github-token: ${{ secrets.GITHUB_TOKEN }}
     toolsets: [all, dependabot]
@@ -101,7 +97,7 @@ pre-agent-steps:
       persist-credentials: false
   - name: Install compatible Copilot CLI for the custom launcher
     env:
-      GH_AW_COMPILED_VERSION: v0.92.0
+      GH_AW_COMPILED_VERSION: v1.2.2
       # `max` reasoning effort requires Copilot CLI 1.0.60 or newer.
       GH_AW_COPILOT_MIN_VERSION: 1.0.60
     run: |
@@ -177,9 +173,9 @@ safe-outputs:
     allowed-events: [COMMENT]
     commit-id: ${{ github.event.pull_request.head.sha }}
     footer: always
-  missing-tool:
+  report-missing-tool:
     create-issue: false
-  missing-data:
+  report-missing-data:
     create-issue: false
   noop:
     report-as-issue: false
@@ -232,8 +228,8 @@ jobs:
     needs: [prepare, record_review_verdict]
     if: needs.agent.result == 'success' && needs.record_review_verdict.result == 'success'
 
-  ai_review_gate:
-    name: AI review gate
+  ai_review_validate:
+    name: Validate AI review verdict
     if: always()
     needs: [prepare, agent, safe_outputs, record_review_verdict]
     runs-on: ubuntu-latest
@@ -264,6 +260,44 @@ jobs:
           AI_REVIEW_PUBLICATION_STATUS: ${{ needs.safe_outputs.outputs.process_safe_outputs_status }}
           AI_REVIEW_PUBLICATION_ITEMS_APPLIED: ${{ needs.safe_outputs.outputs.process_safe_outputs_items_applied }}
         run: node scripts/review-gate.ts /tmp/review-result/review-result.json
+
+  # Retain the existing check name while consumers migrate to the outer gate.
+  # This reporter reads only job results; artifact validation stays protected.
+  ai_review_gate:
+    name: AI review gate
+    detection-gate: status-only
+    if: always()
+    needs:
+      [
+        prepare,
+        agent,
+        detection,
+        safe_outputs,
+        record_review_verdict,
+        ai_review_validate,
+      ]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require completed review stages
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          AGENT_RESULT: ${{ needs.agent.result }}
+          DETECTION_RESULT: ${{ needs.detection.result }}
+          PUBLICATION_RESULT: ${{ needs.safe_outputs.result }}
+          VERDICT_RESULT: ${{ needs.record_review_verdict.result }}
+          VALIDATION_RESULT: ${{ needs.ai_review_validate.result }}
+        run: |
+          failed=0
+          for stage_result in "prepare:$PREPARE_RESULT" "agent:$AGENT_RESULT" "detection:$DETECTION_RESULT" "safe_outputs:$PUBLICATION_RESULT" "record_review_verdict:$VERDICT_RESULT" "ai_review_validate:$VALIDATION_RESULT"; do
+            stage="${stage_result%%:*}"
+            result="${stage_result#*:}"
+            if [ "$result" != success ]; then
+              printf '%s did not succeed (%s).\n' "$stage" "${result:-missing}" >&2
+              failed=1
+            fi
+          done
+          exit "$failed"
 ---
 
 # Repository-aware pull-request review
