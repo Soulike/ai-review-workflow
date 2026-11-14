@@ -16,6 +16,11 @@ Read the [domain language](GLOSSARY.md) and relevant
 from current `main`; changes to `main` go through pull requests. Preserve
 applicable copyright and permission notices when reusing code or documentation.
 
+For gh-aw or compiler-selected review runtime upgrades, follow the
+[gh-aw upgrade Skill](.agents/skills/upgrade-gh-aw/SKILL.md) before proposing or
+implementing changes. It owns upgrade assessment and decision points; this guide
+owns the editing and validation mechanics.
+
 ## Set up the development environment
 
 Use current Node LTS (`nvm use` reads `.nvmrc`) and the pnpm version declared in
