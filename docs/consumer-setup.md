@@ -86,9 +86,10 @@ The integration must satisfy these requirements:
 - Grant the complete permission set shown in the example's calling job. The
   [public workflow](../.github/workflows/ai-review.yml) requests these permissions;
   a reusable workflow cannot increase its caller's permissions. Read access
-  supports review evidence, `copilot-requests: write` permits inference, and
-  `pull-requests: write` permits comment reviews. The shared workflow narrows
-  permissions per job; the reviewer uses read-only GitHub tools. See
+  supports review evidence, `copilot-requests: write` permits inference,
+  `pull-requests: write` permits comment reviews, and `issues: write` permits
+  framework detection reports. The shared workflow narrows permissions per job;
+  the reviewer retains `issues: read` and uses read-only GitHub tools. See
   [GitHub's permissions reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions).
 - Pass a supported `reasoning-effort` input and map your Tavily secret to
   `TAVILY_API_KEY`. Other inputs are optional; see
@@ -128,7 +129,7 @@ jobs:
       checks: read
       contents: read
       discussions: read
-      issues: read
+      issues: write
       pull-requests: write
       security-events: read
       statuses: read
@@ -143,6 +144,15 @@ jobs:
 
 Here, `secrets.TAVILY_API_KEY` is the repository secret selected for the example;
 the key on the left is the required workflow secret name.
+
+When threat detection reports a warning or failure, gh-aw's `conclusion` job
+creates or reuses an open `[aw] Detection Runs` issue in the consumer repository
+and appends the outcome and run link. This covers threat findings, detector
+execution failures, and invalid detection results. Successful detection does
+not post a report. Issue reporting is best effort: a reporting failure produces
+a warning, while detection enforcement and the review gate still determine
+whether the review completed successfully. See
+[gh-aw's detection reporting documentation](https://github.github.com/gh-aw/reference/threat-detection/#issue-reporting-permissions).
 
 The shared workflow allows agent stages from different runs to execute
 concurrently. Job-level concurrency in the example cancels superseded review
@@ -252,6 +262,12 @@ review, and the structured verdict must be `approved`. Failure, cancellation,
 skipping, or missing required evidence fails the gate.
 
 ### Migrate an existing required check
+
+For the gh-aw v1.2.2 upgrade, first grant `issues: write` in each consumer's
+calling job. Every level of the reusable-workflow chain must permit the
+`conclusion` job's issue reporting. For callers following `@main`, merge those
+permission changes before merging the shared workflow upgrade; the existing
+shared workflow can run under that larger caller ceiling.
 
 The workflow also retains `Review / Engine / AI review gate`, which checks
 mandatory review stages inside the Engine. It remains available while existing
