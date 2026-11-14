@@ -86,9 +86,10 @@ The integration must satisfy these requirements:
 - Grant the complete permission set shown in the example's calling job. The
   [public workflow](../.github/workflows/ai-review.yml) requests these permissions;
   a reusable workflow cannot increase its caller's permissions. Read access
-  supports review evidence, `copilot-requests: write` permits inference, and
-  `pull-requests: write` permits comment reviews. The shared workflow narrows
-  permissions per job; the reviewer uses read-only GitHub tools. See
+  supports review evidence, `copilot-requests: write` permits inference,
+  `pull-requests: write` permits comment reviews, and `issues: write` permits
+  framework detection reports. The shared workflow narrows permissions per job;
+  the reviewer retains `issues: read` and uses read-only GitHub tools. See
   [GitHub's permissions reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions).
 - Pass a supported `reasoning-effort` input and map your Tavily secret to
   `TAVILY_API_KEY`. Other inputs are optional; see
@@ -128,7 +129,7 @@ jobs:
       checks: read
       contents: read
       discussions: read
-      issues: read
+      issues: write
       pull-requests: write
       security-events: read
       statuses: read
@@ -143,6 +144,15 @@ jobs:
 
 Here, `secrets.TAVILY_API_KEY` is the repository secret selected for the example;
 the key on the left is the required workflow secret name.
+
+When threat detection reports a warning or failure, gh-aw's `conclusion` job
+creates or reuses an open `[aw] Detection Runs` issue in the consumer repository
+and appends the outcome and run link. This covers threat findings, detector
+execution failures, and invalid detection results. Successful detection does
+not post a report. Issue reporting is best effort: a reporting failure produces
+a warning, while detection enforcement and the review gate still determine
+whether the review completed successfully. See
+[gh-aw's detection reporting documentation](https://github.github.com/gh-aw/reference/threat-detection/#issue-reporting-permissions).
 
 The shared workflow allows agent stages from different runs to execute
 concurrently. Job-level concurrency in the example cancels superseded review
@@ -223,7 +233,8 @@ for supported ecosystem identifiers and domain syntax.
 
 After the caller and any configured prompt reach your default branch, trigger
 a new supported event on a ready PR. The introducing PR cannot verify a newly
-deployed `pull_request_target` workflow. Before making the gate required:
+deployed `pull_request_target` workflow. For initial setup, before making the
+gate required:
 
 1. Open the run in Actions and confirm setup, inference, and publication succeed
    in your repository. This checks your actual credentials, model access, and
@@ -237,13 +248,36 @@ deployed `pull_request_target` workflow. Before making the gate required:
    changes. The gate reads a structured result, not the review's Markdown.
 3. Select the check name GitHub actually emits in your branch's required-check
    settings. With the example's job name, expect
-   `Review / Engine / AI review gate`; renaming the calling job changes the
+   `Review / AI review gate`; renaming the calling job changes the
    prefix. Bind the required check to GitHub Actions where supported.
 
 Keep human merge control and ordinary candidate CI. The workflow publishes
 `COMMENT` reviews, not GitHub approvals or `REQUEST_CHANGES` reviews. A passing
 review gate is not permission to merge, and the reviewer does not replace your
 test workflow.
+
+The final gate waits for the complete Engine, including gh-aw's concluding
+jobs. Every mandatory review stage must succeed, publication must apply the
+review, and the structured verdict must be `approved`. Failure, cancellation,
+skipping, or missing required evidence fails the gate.
+
+### Migrate an existing required check
+
+For the gh-aw v1.2.2 upgrade, first grant `issues: write` in each consumer's
+calling job. Every level of the reusable-workflow chain must permit the
+`conclusion` job's issue reporting. For callers following `@main`, merge those
+permission changes before merging the shared workflow upgrade; the existing
+shared workflow can run under that larger caller ceiling.
+
+The workflow also retains `Review / Engine / AI review gate`, which checks
+mandatory review stages inside the Engine. It remains available while existing
+consumers migrate. Once the updated shared workflow is effective on `main`,
+replace that old required context with `Review / AI review gate` in each
+consumer's active branch ruleset. Preserve the GitHub Actions app binding and
+all other required checks and rules, then read the settings back to confirm
+the replacement. The new outer check additionally covers later Engine
+finalization. Consumer runtime verification follows the consumer maintainer's
+rollout policy.
 
 ## Drafts, changes, and recovery
 
@@ -274,10 +308,12 @@ trigger a new supported PR event rather than rerunning the old event.
   **Re-run all jobs**. The verdict artifact is retained for **30 days**; other
   artifacts follow gh-aw and repository retention settings.
 
-Re-running only the gate reads the existing result and does not publish again.
-Re-running publication may leave another visible review; there is no comment
-deduplication or cleanup. Failed prerequisites or a missing or invalid structured
-result cannot pass the gate.
+Re-running only the final gate checks the existing Engine result and does not
+publish again. Failed Engine stages must first succeed; result validation
+inside the Engine reads the retained verdict artifact. Re-running publication
+may leave another visible review; there is no comment deduplication or cleanup.
+Failed prerequisites or a missing or invalid structured result cannot pass the
+gate.
 
 Consumers follow `main`, with no release or version-bump process. If an upstream
 change breaks reviews, report the run URL and workflow implementation SHA.

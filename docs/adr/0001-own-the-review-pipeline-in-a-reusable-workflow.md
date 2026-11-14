@@ -4,6 +4,9 @@ The verdict-authentication aspects of this decision were superseded by
 [ADR 0008](0008-use-stateless-structured-review-results.md). Reusable pipeline
 ownership remains unchanged; the original decision is recorded below.
 
+The exclusion of automatic operational issue reporting was partially superseded
+by [ADR 0009](0009-retain-detection-issue-reporting.md) for gh-aw detection reports.
+
 The review pipeline is distributed through a reusable GitHub workflow plus
 consumer configuration, rather than copied implementation scripts or an
 installation Skill. The reusable workflow owns setup, review execution, safe

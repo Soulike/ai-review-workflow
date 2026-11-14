@@ -1,7 +1,11 @@
 export type ReviewVerdict = "approved" | "needs-change";
 export type ReviewResult = { verdict: ReviewVerdict };
 
-const failingSafeOutputTypes = new Set(["missing_data", "report_incomplete"]);
+const failingSafeOutputTypes = new Set([
+  "missing_data",
+  "report_missing_data",
+  "report_incomplete",
+]);
 
 export function readReviewResult(value: unknown): ReviewResult {
   if (

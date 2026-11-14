@@ -16,6 +16,11 @@ Read the [domain language](GLOSSARY.md) and relevant
 from current `main`; changes to `main` go through pull requests. Preserve
 applicable copyright and permission notices when reusing code or documentation.
 
+For gh-aw or compiler-selected review runtime upgrades, follow the
+[gh-aw upgrade Skill](.agents/skills/upgrade-gh-aw/SKILL.md) before proposing or
+implementing changes. It owns upgrade assessment and decision points; this guide
+owns the editing and validation mechanics.
+
 ## Set up the development environment
 
 Use current Node LTS (`nvm use` reads `.nvmrc`) and the pnpm version declared in
@@ -26,11 +31,11 @@ language features, not a fixed CI selection.
 pnpm install --frozen-lockfile --ignore-scripts
 ```
 
-Workflow validation also needs Git, GitHub CLI, gh-aw **v0.92.0**, and
+Workflow validation also needs Git, GitHub CLI, gh-aw **v1.2.2**, and
 **actionlint v1.7.12**. If the gh-aw extension is not already installed:
 
 ```sh
-gh extension install github/gh-aw --pin v0.92.0
+gh extension install github/gh-aw --pin v1.2.2
 ```
 
 If another gh-aw version is installed, select an isolated official release
@@ -47,12 +52,12 @@ This repository ships a reusable workflow, not a published JavaScript library.
 
 ```text
 .github/workflows/
-  ai-review.yml       Public reusable interface; forwards inputs and secrets
+  ai-review.yml       Public reusable interface and final Engine gate
   review.md           Review prompt and orchestration source
   review.lock.yml     Compiled executable workflow; do not edit by hand
   review-pr.yml       This repository's caller of the public interface
   ci.yml              Candidate-code validation
-  review.test.ts      Workflow installer/launcher tests
+  review.test.ts      Executable workflow gate and installer/launcher tests
 scripts/              Commands launched by workflows or package.json
   lib/                Internal modules imported by those commands
 docs/                 Consumer setup, repository conventions, and decisions
@@ -120,10 +125,20 @@ When changing workflow setup, preserve these implementation constraints:
 
 For verdict and publication changes, preserve the
 [stateless structured-result contract](docs/adr/0008-use-stateless-structured-review-results.md).
-The gate consumes the result artifact, prerequisite job outcomes, and applied
-publication status. A successful publication job that skipped the required
-review cannot satisfy the gate. Review prose and current PR state are not gate
-inputs.
+Result validation consumes the result artifact, prerequisite job outcomes, and
+applied publication status. A successful publication job that skipped the
+required review cannot satisfy validation. Review prose and current PR state
+are not gate inputs.
+
+Keep result validation behind gh-aw's detection guard. A separate leaf job uses
+`detection-gate: status-only` and `if: always()` to reject any mandatory stage
+whose result is not `success`, including skipped or missing validation. It reads
+only job results and retains the inner `AI review gate` check for existing
+consumers. The public wrapper's final `AI review gate` waits for the entire
+Engine, including gh-aw's later `conclusion` job, and requires Engine success.
+Putting that final gate inside the compiled workflow would leave framework
+finalization outside its result. The public required-check name is documented
+in the [consumer guide](docs/consumer-setup.md#verify-and-require-the-gate).
 
 ## Test and validate your change
 
@@ -173,7 +188,7 @@ consolidating a test.
 
 Do not duplicate workflow literals in Node assertions as a substitute for
 testing GitHub behavior. [`review.test.ts`](.github/workflows/review.test.ts) executes
-installer/launcher fragments; it does not emulate Actions. Local tests cannot
+gate and installer/launcher fragments; it does not emulate Actions. Local tests cannot
 establish live inference, authorization, checkout context, scheduling, or
 publication. Exact model prose is not a golden
 test oracle.
