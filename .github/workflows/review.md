@@ -115,16 +115,16 @@ pre-agent-steps:
       AI_REVIEW_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       AI_REVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
     run: node workflow/scripts/prepare-review.ts --repository-root consumer
-  - name: Install latest review Skills
-    run: npx --yes skills@latest add mattpocock/skills --agent github-copilot --skill codebase-design tdd writing-for-agents --copy --yes --full-depth
   - name: Install latest review plugins
     env:
       COPILOT_GITHUB_TOKEN: ${{ github.token }}
     run: |
       copilot plugin marketplace add Soulike/knowledge-base
       copilot plugin marketplace add GoogleChrome/modern-web-guidance
+      copilot plugin marketplace add mattpocock/skills
       copilot plugin install knowledge-base@knowledge-base
       copilot plugin install modern-web-guidance@googlechrome
+      copilot plugin install mattpocock-skills@mattpocock
       copilot plugin list
   - name: Remove and verify Git credentials
     run: |
