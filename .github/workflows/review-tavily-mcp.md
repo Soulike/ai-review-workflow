@@ -49,6 +49,7 @@ permissions:
 
 imports:
   - shared/review-core.md
+  - shared/review-prompt.md
 
 mcp-servers:
   tavily:
@@ -63,4 +64,4 @@ network:
   allowed-input: true
 ---
 
-{{#runtime-import .github/workflows/shared/review-prompt.md}}
+Follow the imported pull-request review instructions.
