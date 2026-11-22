@@ -20,14 +20,26 @@ credentials are outside this interface.
   billing access. Follow [GitHub's prerequisites](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli-in-actions),
   including the policy for organization-billed CLI use. A personal subscription
   alone does not establish access for this workflow's token.
-- Store a Tavily API key in an Actions secret available to your repository.
-  Tavily searches for current external sources and retrieves their content.
-  The secret's name in your repository is your choice; pass it to the workflow
-  as `TAVILY_API_KEY`.
+- Store a web-search API key in an Actions secret available to your
+  repository:
+  - **`DEEPSEEK_API_KEY` (recommended):** Uses `@soulike/deepseek-web-mcp`
+    (`@latest`) via DeepSeek's Web Search and Fetch APIs. This secret powers only
+    the web search/fetch MCP tools; review inference still uses GitHub Copilot
+    (`model` and `GITHUB_TOKEN`).
+  - **`TAVILY_API_KEY` (fallback):** Uses Tavily's MCP server to search for
+    current external sources and retrieve their content.
 
-The public interface accepts only the Tavily secret. GitHub supplies the
-built-in token; do not pass a PAT, `COPILOT_GITHUB_TOKEN`, or `GH_AW_*` token
-override. Use explicit secret mapping, not `secrets: inherit`.
+  If `DEEPSEEK_API_KEY` is non-empty, the workflow installs and uses
+  `@soulike/deepseek-web-mcp` and ignores `TAVILY_API_KEY`. If only
+  `TAVILY_API_KEY` is set, it uses Tavily instead. If neither secret is
+  provided, the workflow fails before inference. The secret name in your
+  repository is your choice; pass it to the workflow as `DEEPSEEK_API_KEY` or
+  `TAVILY_API_KEY`.
+
+The public interface accepts only `DEEPSEEK_API_KEY` and `TAVILY_API_KEY`.
+GitHub supplies the built-in token; do not pass a PAT, `COPILOT_GITHUB_TOKEN`,
+or `GH_AW_*` token override. Use explicit secret mapping, not
+`secrets: inherit`.
 
 Your repository's PR-admission settings remain yours. The workflow repository's
 collaborator-only policy is not a consumer prerequisite; gh-aw's own actor
@@ -71,9 +83,8 @@ This integration requires `pull_request_target`; switching the caller to
 Call `Soulike/ai-review-workflow/.github/workflows/ai-review.yml@main` from a
 job's `uses`, not from a step. You can add that job to an existing workflow or
 create a workflow under `.github/workflows/`. Choose a caller filename such as
-`review-pr.yml` or `ai-review.yml`. The filename `review.lock.yml` is temporarily
-unsupported: the pinned gh-aw runtime mistakes that caller for the shared engine
-and fails activation ([compatibility issue #12](https://github.com/Soulike/ai-review-workflow/issues/12)).
+`review-pr.yml` or `ai-review.yml`; avoid `review-deepseek-web-mcp.lock.yml` and
+`review-tavily-mcp.lock.yml`, which match the shared compiled engine names.
 The workflow name and job name are your choices. See
 [GitHub's reusable-workflow syntax](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
 for how the calling job fits into a workflow.
@@ -91,9 +102,9 @@ The integration must satisfy these requirements:
   framework detection reports. The shared workflow narrows permissions per job;
   the reviewer retains `issues: read` and uses read-only GitHub tools. See
   [GitHub's permissions reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions).
-- Pass a supported `reasoning-effort` input and map your Tavily secret to
-  `TAVILY_API_KEY`. Other inputs are optional; see
-  [review configuration](#configure-the-review).
+- Pass a supported `reasoning-effort` input and map your web-search secret to
+  `DEEPSEEK_API_KEY` (or `TAVILY_API_KEY` as a fallback). Other inputs are
+  optional; see [review configuration](#configure-the-review).
 - Invoke it once per caller workflow run. Repeated or matrix calls can collide
   on framework artifact names.
 
@@ -139,11 +150,13 @@ jobs:
     with:
       reasoning-effort: high
     secrets:
-      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 ```
 
-Here, `secrets.TAVILY_API_KEY` is the repository secret selected for the example;
-the key on the left is the required workflow secret name.
+Here, `secrets.DEEPSEEK_API_KEY` is the repository secret selected for the
+example; the key on the left is the workflow secret name. To use Tavily instead,
+pass `TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}`. If you pass both secrets,
+`DEEPSEEK_API_KEY` takes precedence and `TAVILY_API_KEY` is ignored.
 
 When threat detection reports a warning or failure, gh-aw's `conclusion` job
 creates or reuses an open `[aw] Detection Runs` issue in the consumer repository
@@ -207,8 +220,10 @@ reviewer select relevant guidance for the responsibilities affected by each
 change; repository criteria can add project-specific standards without owning
 or replacing that process.
 
-The shared [review instructions](../.github/workflows/review.md#review-body) lead
-with the AI review's conclusion, followed by a brief explanation and visible
+The shared
+[review instructions](../.github/workflows/shared/review-prompt.md#review-body)
+lead with the AI review's conclusion, followed by a brief explanation and
+visible
 model, commit, and severity details. The explanation identifies the final
 understood objective and whether its rationale and implementation are supported.
 Summaries use the main language of the PR description, with English as the
@@ -216,9 +231,10 @@ fallback; wording varies with the change.
 
 ### Extra network access
 
-The default sandbox allowlist includes Tavily (`mcp.tavily.com`) and gh-aw's
-`github` domain group, including GitHub documentation and raw file hosts. Pass
-`network_allowed` to add other sources. For example,
+The default sandbox allowlist includes gh-aw's `github` domain group (including
+GitHub documentation and raw file hosts) plus the active search backend host:
+`api.deepseek.com` when using DeepSeek Web MCP, or `mcp.tavily.com` when using
+Tavily MCP. Pass `network_allowed` to add other sources. For example,
 `node,python,docs.example.com` adds the Node and Python ecosystems plus a
 project-specific documentation host.
 
@@ -260,24 +276,6 @@ The final gate waits for the complete Engine, including gh-aw's concluding
 jobs. Every mandatory review stage must succeed, publication must apply the
 review, and the structured verdict must be `approved`. Failure, cancellation,
 skipping, or missing required evidence fails the gate.
-
-### Migrate an existing required check
-
-For the gh-aw v1.2.2 upgrade, first grant `issues: write` in each consumer's
-calling job. Every level of the reusable-workflow chain must permit the
-`conclusion` job's issue reporting. For callers following `@main`, merge those
-permission changes before merging the shared workflow upgrade; the existing
-shared workflow can run under that larger caller ceiling.
-
-The workflow also retains `Review / Engine / AI review gate`, which checks
-mandatory review stages inside the Engine. It remains available while existing
-consumers migrate. Once the updated shared workflow is effective on `main`,
-replace that old required context with `Review / AI review gate` in each
-consumer's active branch ruleset. Preserve the GitHub Actions app binding and
-all other required checks and rules, then read the settings back to confirm
-the replacement. The new outer check additionally covers later Engine
-finalization. Consumer runtime verification follows the consumer maintainer's
-rollout policy.
 
 ## Drafts, changes, and recovery
 

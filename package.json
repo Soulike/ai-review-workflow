@@ -27,6 +27,8 @@
     "prettier": "^3.9.6",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.69.0",
+    "vfile": "^6.0.3",
+    "vfile-matter": "^5.0.1",
     "yaml": "^2.9.0"
   }
 }

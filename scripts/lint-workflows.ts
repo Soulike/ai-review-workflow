@@ -7,8 +7,10 @@ import { parseDocument } from "yaml";
 // API permissions. Every level must retain these narrow read capabilities.
 for (const [file, job] of [
   [".github/workflows/review-pr.yml", "review"],
-  [".github/workflows/ai-review.yml", "engine"],
-  [".github/workflows/review.lock.yml", "agent"],
+  [".github/workflows/ai-review.yml", "engine_deepseek_web"],
+  [".github/workflows/ai-review.yml", "engine_tavily"],
+  [".github/workflows/review-deepseek-web-mcp.lock.yml", "agent"],
+  [".github/workflows/review-tavily-mcp.lock.yml", "agent"],
 ] as const) {
   const workflow = parseDocument(await readFile(file, "utf8"));
   for (const permission of ["checks", "statuses"]) {
@@ -36,7 +38,8 @@ const { stdout, stderr } = await promisify(execFile)(
     ".github/workflows/ci.yml",
     ".github/workflows/ai-review.yml",
     ".github/workflows/review-pr.yml",
-    ".github/workflows/review.lock.yml",
+    ".github/workflows/review-deepseek-web-mcp.lock.yml",
+    ".github/workflows/review-tavily-mcp.lock.yml",
   ],
 );
 process.stdout.write(stdout);

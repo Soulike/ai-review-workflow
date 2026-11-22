@@ -52,16 +52,19 @@ This repository ships a reusable workflow, not a published JavaScript library.
 
 ```text
 .github/workflows/
-  ai-review.yml       Public reusable interface and final Engine gate
-  review.md           Review prompt and orchestration source
-  review.lock.yml     Compiled executable workflow; do not edit by hand
-  review-pr.yml       This repository's caller of the public interface
-  ci.yml              Candidate-code validation
-  review.test.ts      Executable workflow gate and installer/launcher tests
-scripts/              Commands launched by workflows or package.json
-  lib/                Internal modules imported by those commands
-docs/                 Consumer setup, repository conventions, and decisions
-package.json          Shared local/CI command entrypoints
+  ai-review.yml                    Public reusable interface, MCP routing, and final Engine gate
+  review-deepseek-web-mcp.md       DeepSeek Web MCP engine source
+  review-deepseek-web-mcp.lock.yml Compiled DeepSeek Web MCP workflow; do not edit by hand
+  review-tavily-mcp.md             Tavily MCP engine source
+  review-tavily-mcp.lock.yml       Compiled Tavily MCP workflow; do not edit by hand
+  shared/                          Shared gh-aw core config and review prompt imported by both engines
+  review-pr.yml                    This repository's caller of the public interface
+  ci.yml                           Candidate-code validation
+  review.test.ts                   Executable workflow gate, consistency, and installer/launcher tests
+scripts/                           Commands launched by workflows or package.json
+  lib/                             Internal modules imported by those commands
+docs/                              Consumer setup, repository conventions, and decisions
+package.json                       Shared local/CI command entrypoints
 ```
 
 Keep executable entrypoints at the top of `scripts/` and the modules they import
@@ -83,30 +86,39 @@ Keep `*.test.ts` files beside the code they exercise: module tests in
 `.github/workflows/`. There is no separate tests directory.
 
 Put triggers, permissions, job dependencies, and reviewer instructions in the
-workflow sources. The public interface calls the same-revision compiled engine
-and forwards only the Tavily search and extraction secret, keeping compiler-added
-`aw_context` and optional token overrides out of the consumer interface. Update the
+workflow sources. The public interface routes between compiled engines via
+`scripts/select-search-mcp.ts` and forwards only `DEEPSEEK_API_KEY` and
+`TAVILY_API_KEY`, keeping compiler-added `aw_context` and optional token
+overrides out of the consumer interface. Update the
 [consumer guide](docs/consumer-setup.md) when changing that interface or its
 observable behavior.
 
 ## Change and compile workflows
 
-Edit `review.md`, then regenerate the executable workflow:
+Edit `shared/` or the entry workflows (`review-deepseek-web-mcp.md` and
+`review-tavily-mcp.md`), then regenerate the executable workflows:
 
 ```sh
 pnpm workflows:compile
 ```
 
-Review and commit the source and generated changes together. `review.lock.yml`,
-`.github/aw/`, and generated entries in `.gitattributes` are compiler-owned.
-Authored Actions use version tags; gh-aw resolves those tags to hashes. Do not
-hand-edit or reformat generated artifacts.
+Review and commit the source and generated changes together. The compiled
+`*.lock.yml` workflows, `.github/aw/`, and generated entries in `.gitattributes`
+are compiler-owned. Authored Actions use version tags; gh-aw resolves those
+tags to hashes. Do not hand-edit or reformat generated artifacts.
 
 When changing workflow setup, preserve these implementation constraints:
 
+- `gh-aw` compiles `mcp-servers:` statically into each lock file, so
+  `ai-review.yml` routes between `review-deepseek-web-mcp.lock.yml` and
+  `review-tavily-mcp.lock.yml` instead of enabling both servers in one run.
+  Keep shared configuration in `.github/workflows/shared/`, and keep the two
+  thin entry files' shared frontmatter fields identical (`review.test.ts`
+  enforces parity).
 - Explicit pre-Agent checkouts select consumer-base instructions separately
-  from implementation assets. Automatic checkout is disabled because gh-aw
-  cannot infer the caller's target-event checkout protection from `workflow_call`.
+  from implementation assets. Automatic checkout (`checkout: false` in each
+  entry workflow) is disabled because gh-aw cannot infer the caller's
+  target-event checkout protection from `workflow_call`.
   Do not install consumer dependencies or ask the reviewer to run candidate
   code. Candidate tests belong to separate CI; broad sandbox tools remain, so
   the non-execution rule is an instruction, not a technical barrier.
@@ -119,9 +131,11 @@ When changing workflow setup, preserve these implementation constraints:
   selected binary on the read-only runtime mount. Keep compiler/runtime
   versions coordinated in [`compiler-contract.ts`](scripts/lib/compiler-contract.ts)
   and the pre-Agent install environment.
-- `network.allowed` in `review.md` owns the defaults. Native
-  `network.allowed-input` adds the `network_allowed` input; the public interface
-  forwards it unchanged and gh-aw merges additions before starting the firewall.
+- `network.allowed` in `shared/review-core.md` owns the `github` default group,
+  and each entry workflow adds its search backend host (`api.deepseek.com` or
+  `mcp.tavily.com`). Native `network.allowed-input` adds the `network_allowed`
+  input; the public interface forwards it unchanged and gh-aw merges additions
+  before starting the firewall.
 
 For verdict and publication changes, preserve the
 [stateless structured-result contract](docs/adr/0008-use-stateless-structured-review-results.md).
@@ -130,15 +144,15 @@ applied publication status. A successful publication job that skipped the
 required review cannot satisfy validation. Review prose and current PR state
 are not gate inputs.
 
-Keep result validation behind gh-aw's detection guard. A separate leaf job uses
-`detection-gate: status-only` and `if: always()` to reject any mandatory stage
-whose result is not `success`, including skipped or missing validation. It reads
-only job results and retains the inner `AI review gate` check for existing
-consumers. The public wrapper's final `AI review gate` waits for the entire
-Engine, including gh-aw's later `conclusion` job, and requires Engine success.
-Putting that final gate inside the compiled workflow would leave framework
-finalization outside its result. The public required-check name is documented
-in the [consumer guide](docs/consumer-setup.md#verify-and-require-the-gate).
+Keep result validation behind gh-aw's detection guard. Inside each compiled
+workflow, a separate leaf job uses `detection-gate: status-only` and
+`if: always()` to reject any mandatory stage whose result is not `success`,
+including skipped or missing validation. The public wrapper's final
+`AI review gate` waits for the selector and selected Engine (including gh-aw's
+later `conclusion` job) via `scripts/engine-gate.ts`. Putting that final gate
+inside the compiled workflow would leave framework finalization outside its
+result. The public required-check name is documented in the
+[consumer guide](docs/consumer-setup.md#verify-and-require-the-gate).
 
 ## Test and validate your change
 
