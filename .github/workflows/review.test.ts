@@ -392,4 +392,52 @@ for (const workflowFile of compiledWorkflows) {
       /reasoning effort is required/u,
     );
   });
+
+  test(`${workflowFile}: inlines prompt content without runtime-import lookups`, async () => {
+    const compiled = parseDocument(
+      await readFile(new URL(workflowFile, root), "utf8"),
+    );
+    const steps = compiled.getIn(["jobs", "activation", "steps"]);
+    assert.ok(isSeq(steps));
+    const promptStep = steps.items.find(
+      (item) =>
+        isMap(item) &&
+        item.get("name") === "Create prompt with built-in context",
+    );
+    assert.ok(
+      isMap(promptStep),
+      "expected Create prompt with built-in context step",
+    );
+    const env = promptStep.get("env");
+    assert.ok(isMap(env));
+
+    const promptChunks = env.items
+      .filter(
+        ({ key }) =>
+          isScalar(key) &&
+          typeof key.value === "string" &&
+          key.value.startsWith("GH_AW_PROMPT_CONTENT_"),
+      )
+      .map(({ key, value }) => {
+        assert.ok(isScalar(key) && typeof key.value === "string");
+        assert.ok(isScalar(value) && typeof value.value === "string");
+        return [key.value, value.value] as const;
+      });
+    assert.ok(
+      promptChunks.length > 0,
+      "expected GH_AW_PROMPT_CONTENT_* entries",
+    );
+
+    for (const [key, value] of promptChunks) {
+      assert.doesNotMatch(
+        value,
+        /\{\{#(?:runtime-import|import)\b/u,
+        `${key} must not contain runtime import directives for cross-repo callers`,
+      );
+    }
+
+    const combinedPrompt = promptChunks.map(([, value]) => value).join("\n");
+    assert.match(combinedPrompt, /# Repository-aware pull-request review/u);
+    assert.match(combinedPrompt, /## Publication contract/u);
+  });
 }

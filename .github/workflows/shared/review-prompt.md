@@ -1,3 +1,7 @@
+---
+# Shared repository-aware pull-request review prompt.
+---
+
 # Repository-aware pull-request review
 
 The consumer repository is `${{ github.repository }}` and the pull request is
