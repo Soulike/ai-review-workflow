@@ -23,14 +23,41 @@ on:
         required: false
         default: ""
     secrets:
+      DEEPSEEK_API_KEY:
+        required: false
       TAVILY_API_KEY:
-        required: true
+        required: false
 
 permissions: {}
 
 jobs:
-  engine:
-    name: Engine
+  select_search_mcp:
+    name: Select search MCP
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      mcp: ${{ steps.select.outputs.mcp }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+      - name: Select search MCP backend
+        id: select
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+        run: node scripts/select-search-mcp.ts
+
+  engine_deepseek_web:
+    name: Engine (DeepSeek Web MCP)
+    needs: [select_search_mcp]
+    if: needs.select_search_mcp.outputs.mcp == 'deepseek-web'
     permissions:
       actions: read
       checks: read
@@ -42,7 +69,31 @@ jobs:
       statuses: read
       vulnerability-alerts: read
       copilot-requests: write
-    uses: ./.github/workflows/review.lock.yml
+    uses: ./.github/workflows/review-deepseek-web-mcp.lock.yml
+    with:
+      review-prompt-path: ${{ inputs.review-prompt-path }}
+      model: ${{ inputs.model }}
+      reasoning-effort: ${{ inputs.reasoning-effort }}
+      network_allowed: ${{ inputs.network_allowed }}
+    secrets:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+
+  engine_tavily:
+    name: Engine (Tavily MCP)
+    needs: [select_search_mcp]
+    if: needs.select_search_mcp.outputs.mcp == 'tavily'
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      discussions: read
+      issues: write
+      pull-requests: write
+      security-events: read
+      statuses: read
+      vulnerability-alerts: read
+      copilot-requests: write
+    uses: ./.github/workflows/review-tavily-mcp.lock.yml
     with:
       review-prompt-path: ${{ inputs.review-prompt-path }}
       model: ${{ inputs.model }}
@@ -54,15 +105,23 @@ jobs:
   ai_review_gate:
     name: AI review gate
     if: always()
-    needs: [engine]
+    needs: [select_search_mcp, engine_deepseek_web, engine_tavily]
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
       - name: Require completed Engine
         env:
-          ENGINE_RESULT: ${{ needs.engine.result }}
-        run: |
-          if [ "$ENGINE_RESULT" != success ]; then
-            printf 'Engine did not succeed (%s).\n' "${ENGINE_RESULT:-missing}" >&2
-            exit 1
-          fi
+          AI_REVIEW_SELECT_RESULT: ${{ needs.select_search_mcp.result }}
+          AI_REVIEW_SELECTED_MCP: ${{ needs.select_search_mcp.outputs.mcp }}
+          AI_REVIEW_DEEPSEEK_ENGINE_RESULT: ${{ needs.engine_deepseek_web.result }}
+          AI_REVIEW_TAVILY_ENGINE_RESULT: ${{ needs.engine_tavily.result }}
+        run: node scripts/engine-gate.ts
